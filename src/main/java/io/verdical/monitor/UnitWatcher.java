@@ -14,7 +14,7 @@ import java.util.logging.Logger;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
@@ -34,26 +34,22 @@ public class UnitWatcher {
 	public UnitWatcher(String[] args) throws Exception {
 		isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
 				.indexOf("jdwp") >= 0;
-		String d = System.getProperty("user.home");
-		if (d == null || d.length() == 0) {
-			throw new IllegalArgumentException(
-					"Unable to determine user.home directory from System.getProperty(\"user.home\")");
-		}
 	}
 
 	private void setUpPage() throws Exception {
 		driver.get("https://build.particle.io/");
 		try {
+			logger.severe("You have " + sleepSeconds + " seconds to enter the username and password...");
 			wait.until(ExpectedConditions.elementToBeClickable(By.className("ion-pinpoint")));
 			WebElement devicesEl = driver.findElement(By.className("ion-pinpoint"));
 			devicesEl.click();
 		} catch (Exception e) {
-			throw new Exception("Error waiting for element By.className(\"ion-pinpoint\"). Are you logged into build.particle.io?");
+			throw new Exception("Error waiting for elementToBeClickable By.className(\"ion-pinpoint\"). Are you logged into build.particle.io?");
 		}
 		try {
-			wait.until(ExpectedConditions.elementToBeClickable(By.className("btn newcore")));
+			wait.until(ExpectedConditions.elementToBeClickable(By.className("newcore")));
 		} catch (Exception e) {
-			throw new Exception("Error waiting for element By.className(\"btn newcore\"). Are you logged into build.particle.io?");
+			throw new Exception("Error waiting for elementToBeClickable By.className(\"newcore\"). Are the 'Particle Devices' visible?");
 		}
 	}
 
@@ -85,7 +81,7 @@ public class UnitWatcher {
 		    LocalDateTime limit = currentTime.withDayOfYear(currentTime.getDayOfYear() - 1);
 			for (String key : unitLastAlive.keySet()) {
 				if (unitLastAlive.get(key).isBefore(limit)) {
-					logger.severe(key + " : hasn't had a pump on since " + limit);
+					logger.severe(key + " : hasn't had a pump turned on since " + limit);
 				}
 			}
 		    Thread.sleep(60 * 60 * 1000);
@@ -94,7 +90,7 @@ public class UnitWatcher {
 
 	private void initBrowserDriver() {
 		if (driver == null) {
-			driver = new FirefoxDriver();
+			driver = new ChromeDriver();
 			driver.manage().timeouts().implicitlyWait(sleepSeconds, TimeUnit.SECONDS);
 			wait = new WebDriverWait(driver, sleepSeconds, 1000);
 		}
