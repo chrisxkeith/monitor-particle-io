@@ -22,9 +22,12 @@ public class UnitWatcher {
 	
 	private static final Logger logger = Logger.getLogger(UnitWatcher.class.getName());
 
+	private String accountName;
+	private String accountPw;
+
 	final boolean isDebug;
 	final int sleepFactor = 2; // increase for slower computers.
-	final int sleepSeconds = 30 * sleepFactor;
+	final int sleepSeconds = 10 * sleepFactor;
 
 	private WebDriver driver;
 	private WebDriverWait wait;
@@ -38,8 +41,17 @@ public class UnitWatcher {
 
 	private void setUpPage() throws Exception {
 		driver.get("https://build.particle.io/");
+		Thread.sleep(2 * 1000);
+		WebElement name = driver.findElement(By.name("username"));
+		name.sendKeys(accountName);
+		Thread.sleep(2 * 1000);
+		WebElement pw = driver.findElement(By.name("password"));
+		pw.sendKeys(accountPw);
+		goToDevices();
+	}
+
+	private void goToDevices() throws Exception {
 		try {
-			logger.severe("You have " + sleepSeconds + " seconds to enter the username and password...");
 			wait.until(ExpectedConditions.elementToBeClickable(By.className("ion-pinpoint")));
 			WebElement devicesEl = driver.findElement(By.className("ion-pinpoint"));
 			devicesEl.click();
@@ -54,38 +66,44 @@ public class UnitWatcher {
 	}
 
 	private void watchUnits() throws Exception {
-		while (true) {
-			// Use when code is added to navigate to console and see messages.
-		    LocalDateTime currentTime = LocalDateTime.now();
+	    LocalDateTime currentTime = LocalDateTime.now();
+	    List<String> unitsAlive = new ArrayList<String>();
+
+// Use when code is added to navigate to Particle console and record 'pump on' messages.
 //		    LocalDateTime date2 = currentTime.withMinute(59);
 //		    Duration duration = Duration.between(date2, currentTime);
 //		    Thread.sleep(duration.toMinutes() * 60 * 1000);
-		    
-		    List<String> unitsAlive = new ArrayList<String>();
-			for (int seconds = 0; seconds < 300; seconds += 10) {
-				WebElement listEl = driver.findElement(By.className("cores"));
-				List<WebElement> photons = listEl.findElements(By.className("breathing"));
-				for (WebElement myElement : photons) {
-					WebElement parent = myElement.findElement(By.xpath(".."));
-					WebElement gp = parent.findElement(By.xpath(".."));
-					WebElement title = gp.findElement(By.className("title"));
-					unitsAlive.add(title.getText());
-				}
+
+//			for (int seconds = 0; seconds < 300; seconds += 10) {
+			WebElement listEl = driver.findElement(By.className("cores"));
+			List<WebElement> photons = listEl.findElements(By.className("breathing"));
+			for (WebElement myElement : photons) {
+				// div > div > li 
+				WebElement greatgrandparent = myElement.findElement(By.xpath("../../.."));
+				WebElement title = greatgrandparent.findElement(By.className("title"));
+				unitsAlive.add(title.getText());
 			}
-			for (String name : unitsAlive) {
-				logger.info(name + " : alive");
-				unitLastAlive.put(name, currentTime);
-			}
-			currentTime = LocalDateTime.now();
-			// TODO : may fail on Jan 1?
-		    LocalDateTime limit = currentTime.withDayOfYear(currentTime.getDayOfYear() - 1);
-			for (String key : unitLastAlive.keySet()) {
-				if (unitLastAlive.get(key).isBefore(limit)) {
-					logger.severe(key + " : hasn't had a pump turned on since " + limit);
-				}
-			}
-		    Thread.sleep(60 * 60 * 1000);
+//		}
+		StringBuilder msg = new StringBuilder("Units alive : ");
+		for (String name : unitsAlive) {
+			unitLastAlive.put(name, currentTime);
+			msg.append(name).append(" ");
 		}
+		logger.info(msg.toString());
+		currentTime = LocalDateTime.now();
+		// TODO : may fail on Jan 1?
+	    LocalDateTime limit = currentTime.withMinute(currentTime.getMinute() - 1);
+		for (String key : unitLastAlive.keySet()) {
+			if (unitLastAlive.get(key).isBefore(limit)) {
+				logger.severe(key + " : hasn't been heard from since " + limit);
+			}
+		}
+	}
+
+	private void doSleep() throws Exception {
+		int secs = 60 * 60;
+		logger.info("About to sleep for " + secs + " seconds.");
+	    Thread.sleep(secs * 1000);
 	}
 
 	private void initBrowserDriver() {
@@ -98,9 +116,22 @@ public class UnitWatcher {
 
 	public void run() {
 		try {
-			initBrowserDriver();
-			setUpPage();
-			watchUnits();
+			System.out.println("Enter account name.");
+			byte[] name = new byte[256];
+			System.in.read(name);
+			System.out.println("Enter account password.");
+			byte[] pw = new byte[256];
+			System.in.read(pw);
+			accountName = new String(name);
+			accountPw = new String(pw);
+			while (true) {
+				initBrowserDriver();
+				setUpPage();
+				watchUnits();
+				doSleep();
+				driver.quit();
+				driver = null;
+			}
 		} catch (Throwable e) {
 			logger.severe("run() : " + e.toString());
 			driver = null;
