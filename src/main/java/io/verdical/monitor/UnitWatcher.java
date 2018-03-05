@@ -2,13 +2,19 @@
 
 package io.verdical.monitor;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 
 import org.openqa.selenium.By;
@@ -34,9 +40,50 @@ public class UnitWatcher {
 	
     private Map<String, LocalDateTime> unitLastAlive = new HashMap<String, LocalDateTime>();
 
+	final private String logFileName = getLogFileName();
+	final private SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
+
 	public UnitWatcher(String[] args) throws Exception {
 		isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
 				.indexOf("jdwp") >= 0;
+		logger.info("Logging to " + logFileName);
+	}
+
+	private String getLogFileName() throws Exception {
+		String d = System.getProperty("user.home");
+		if (d == null || d.length() == 0) {
+			throw new IllegalArgumentException(
+					"Unable to determine user.home directory from System.getProperty(\"user.home\")");
+		}
+		String path = d + File.separator + "Documents" + File.separator + "Github" + File.separator
+				+ "monitor-particle-io";
+		File dir = new File(path);
+		if (!dir.exists()) {
+			throw new IllegalArgumentException(
+					"No such directory : " + path);
+		}
+		String fn = path + File.separator + "log_" + UUID.randomUUID().toString();
+		File f = new File(fn);
+		if (f.exists()) {
+			throw new IllegalArgumentException(
+					"File already exists : " + fn);
+		}
+		return fn;
+    }
+
+	private void log(String s) {
+		logger.info(s);
+		String d = logDateFormat.format(new Date());
+		try {
+			String msg = d + "\t" + s;
+			System.out.println(msg);
+			FileWriter fstream = new FileWriter(logFileName, true);
+			fstream.write(msg + System.getProperty("line.separator"));
+			fstream.close();
+		} catch (Exception e) {
+			System.out
+					.println(d + "\tError writing log file : " + logFileName + "\t" + e.toString());
+		}
 	}
 
 	private void setUpPage() throws Exception {
@@ -65,33 +112,39 @@ public class UnitWatcher {
 		}
 	}
 
+	// Use if code is needed to navigate to Particle console and record 'pump on' messages.
+	@SuppressWarnings("unused")
+	private void recordPumpMessages() throws Exception {
+	    LocalDateTime currentTime = LocalDateTime.now();
+	    // TODO : will fail at 23:00
+	    LocalDateTime date2 = currentTime.withHour(currentTime.getHour() + 1);
+		Duration duration = Duration.between(date2, currentTime);
+		Thread.sleep(duration.toMinutes() * 60 * 1000);
+
+		for (int seconds = 0; seconds < 300; seconds += 10) {
+		}
+	}
+
 	private void watchUnits() throws Exception {
 	    LocalDateTime currentTime = LocalDateTime.now();
 	    List<String> unitsAlive = new ArrayList<String>();
 
-// Use when code is added to navigate to Particle console and record 'pump on' messages.
-//		    LocalDateTime date2 = currentTime.withMinute(59);
-//		    Duration duration = Duration.between(date2, currentTime);
-//		    Thread.sleep(duration.toMinutes() * 60 * 1000);
-
-//			for (int seconds = 0; seconds < 300; seconds += 10) {
-			WebElement listEl = driver.findElement(By.className("cores"));
-			List<WebElement> photons = listEl.findElements(By.className("breathing"));
-			for (WebElement myElement : photons) {
-				// div > div > li 
-				WebElement greatgrandparent = myElement.findElement(By.xpath("../../.."));
-				WebElement title = greatgrandparent.findElement(By.className("title"));
-				unitsAlive.add(title.getText());
-			}
-//		}
+		WebElement listEl = driver.findElement(By.className("cores"));
+		List<WebElement> photons = listEl.findElements(By.className("breathing"));
+		for (WebElement myElement : photons) {
+			// div > div > li
+			WebElement greatgrandparent = myElement.findElement(By.xpath("../../.."));
+			WebElement title = greatgrandparent.findElement(By.className("title"));
+			unitsAlive.add(title.getText());
+		}
 		StringBuilder msg = new StringBuilder("Units alive : ");
 		for (String name : unitsAlive) {
 			unitLastAlive.put(name, currentTime);
 			msg.append(name).append(" ");
 		}
-		logger.info(msg.toString());
+		log(msg.toString());
 		currentTime = LocalDateTime.now();
-		// TODO : may fail on Jan 1?
+		// TODO : will fail on Jan 1
 	    LocalDateTime limit = currentTime.withMinute(currentTime.getMinute() - 1);
 		for (String key : unitLastAlive.keySet()) {
 			if (unitLastAlive.get(key).isBefore(limit)) {
@@ -102,7 +155,7 @@ public class UnitWatcher {
 
 	private void doSleep() throws Exception {
 		int secs = 60 * 60;
-		logger.info("About to sleep for " + secs + " seconds.");
+		log("About to sleep for " + secs + " seconds.");
 	    Thread.sleep(secs * 1000);
 	}
 
@@ -133,7 +186,7 @@ public class UnitWatcher {
 				driver = null;
 			}
 		} catch (Throwable e) {
-			logger.severe("run() : " + e.toString());
+			log("run() : " + e.toString());
 			driver = null;
 		} finally {
 			if (driver != null) {

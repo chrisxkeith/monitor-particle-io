@@ -3,7 +3,6 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.ckkeith</groupId>
-  <artifactId>duration-collector</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
@@ -27,4 +26,5 @@
         <version>3.5.3</version>
     </dependency>
   </dependencies>
+  <artifactId>build-particle-monitor</artifactId>
 </project>
