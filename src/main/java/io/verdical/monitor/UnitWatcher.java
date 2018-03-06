@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 
 import org.openqa.selenium.By;
@@ -27,6 +26,9 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 public class UnitWatcher {
 	
 	private static final Logger logger = Logger.getLogger(UnitWatcher.class.getName());
+
+	private static final int MINUTES_BETWEEN_SCANS = 60;
+	private static final int MINUTES_ALLOWED_OFFLINE = 24 * 60;
 
 	private String accountName;
 	private String accountPw;
@@ -142,7 +144,7 @@ public class UnitWatcher {
 			msg.append(name).append(" ");
 		}
 		log(msg.toString());
-	    LocalDateTime limit = LocalDateTime.now().minusHours(24);
+	    LocalDateTime limit = LocalDateTime.now().minusMinutes(MINUTES_ALLOWED_OFFLINE);
 		for (String key : unitLastAlive.keySet()) {
 			if (unitLastAlive.get(key).isBefore(limit)) {
 				logger.severe(key + " : hasn't been heard from since " + limit);
@@ -151,7 +153,7 @@ public class UnitWatcher {
 	}
 
 	private void doSleep() throws Exception {
-		int secs = 60 * 60;
+		int secs = MINUTES_BETWEEN_SCANS * 60;
 		log("About to sleep for " + secs + " seconds.");
 	    Thread.sleep(secs * 1000);
 	}
