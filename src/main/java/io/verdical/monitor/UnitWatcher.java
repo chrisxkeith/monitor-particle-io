@@ -115,13 +115,12 @@ public class UnitWatcher {
 	// Use if code is needed to navigate to Particle console and record 'pump on' messages.
 	@SuppressWarnings("unused")
 	private void recordPumpMessages() throws Exception {
-	    LocalDateTime currentTime = LocalDateTime.now();
-	    // TODO : will fail at 23:00
-	    LocalDateTime date2 = currentTime.withHour(currentTime.getHour() + 1);
-		Duration duration = Duration.between(date2, currentTime);
+	    LocalDateTime wakeUp = LocalDateTime.now().plusHours(1).withMinute(0);
+		Duration duration = Duration.between(wakeUp, LocalDateTime.now());
 		Thread.sleep(duration.toMinutes() * 60 * 1000);
 
 		for (int seconds = 0; seconds < 300; seconds += 10) {
+			// loop until all "pump on" messages are found.
 		}
 	}
 
@@ -143,9 +142,7 @@ public class UnitWatcher {
 			msg.append(name).append(" ");
 		}
 		log(msg.toString());
-		currentTime = LocalDateTime.now();
-		// TODO : will fail on Jan 1
-	    LocalDateTime limit = currentTime.withMinute(currentTime.getMinute() - 1);
+	    LocalDateTime limit = LocalDateTime.now().minusHours(24);
 		for (String key : unitLastAlive.keySet()) {
 			if (unitLastAlive.get(key).isBefore(limit)) {
 				logger.severe(key + " : hasn't been heard from since " + limit);
