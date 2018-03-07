@@ -147,7 +147,7 @@ public class UnitWatcher {
 	    LocalDateTime limit = LocalDateTime.now().minusMinutes(MINUTES_ALLOWED_OFFLINE);
 		for (String key : unitLastAlive.keySet()) {
 			if (unitLastAlive.get(key).isBefore(limit)) {
-				logger.severe(key + " : hasn't been heard from since " + limit);
+				log(key + " : hasn't been heard from since " + limit);
 			}
 		}
 	}
