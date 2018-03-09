@@ -27,8 +27,8 @@ public class UnitWatcher {
 	
 	private static final Logger logger = Logger.getLogger(UnitWatcher.class.getName());
 
-	private static final int MINUTES_BETWEEN_SCANS = 60;
-	private static final int MINUTES_ALLOWED_OFFLINE = 24 * 60;
+	private static int minutesBetweenScans = 60;
+	private static int minutesAllowedOffline = 24 * 60;
 
 	private String accountName;
 	private String accountPw;
@@ -40,7 +40,7 @@ public class UnitWatcher {
 	private WebDriver driver;
 	private WebDriverWait wait;
 	
-    private Map<String, LocalDateTime> unitLastAlive = new HashMap<String, LocalDateTime>();
+    private Map<String, LocalDateTime> unitLastConnected = new HashMap<String, LocalDateTime>();
 
 	final private String logFileName = getLogFileName();
 	final private SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
@@ -48,7 +48,21 @@ public class UnitWatcher {
 	public UnitWatcher(String[] args) throws Exception {
 		isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
 				.indexOf("jdwp") >= 0;
+		if (isDebug) {
+			minutesBetweenScans = 5;
+			minutesAllowedOffline = 3;
+		}
 		logger.info("Logging to " + logFileName);
+		log("Server started.");
+		unitLastConnected.put("Saha_2", null);
+		unitLastConnected.put("Saha-1", null);
+		unitLastConnected.put("JARDINIERE", null);
+		unitLastConnected.put("bobcat_pizza", null);
+		unitLastConnected.put("MCDS-ver_2", null);
+		unitLastConnected.put("TSWE", null);
+		unitLastConnected.put("test-4a", null);
+		unitLastConnected.put("TEST-5", null);
+		unitLastConnected.put("test-NRNP2", null);
 	}
 
 	private String getLogFileName() throws Exception {
@@ -138,23 +152,29 @@ public class UnitWatcher {
 			WebElement title = greatgrandparent.findElement(By.className("title"));
 			unitsAlive.add(title.getText());
 		}
-		StringBuilder msg = new StringBuilder("Units alive : ");
 		for (String name : unitsAlive) {
-			unitLastAlive.put(name, currentTime);
-			msg.append(name).append(" ");
+			unitLastConnected.put(name, currentTime);
 		}
-		log(msg.toString());
-	    LocalDateTime limit = LocalDateTime.now().minusMinutes(MINUTES_ALLOWED_OFFLINE);
-		for (String key : unitLastAlive.keySet()) {
-			if (unitLastAlive.get(key).isBefore(limit)) {
-				log(key + " : hasn't been heard from since " + limit);
+	    LocalDateTime limit = LocalDateTime.now().minusMinutes(minutesAllowedOffline);
+		for (String key : unitLastConnected.keySet()) {
+			StringBuilder sb = new StringBuilder(key);
+			String status = "unknown";
+			if (unitLastConnected.get(key) == null) {
+				status = "not connected yet";
+			} else if (unitLastConnected.get(key).isBefore(limit)) {
+				String d = logDateFormat.format(limit);
+				status = "disconnected since " + d;
+			} else {
+				status = "connected";
 			}
+			sb.append("\t").append(status);
+			log(sb.toString());
 		}
 	}
 
 	private void doSleep() throws Exception {
-		int secs = MINUTES_BETWEEN_SCANS * 60;
-		log("About to sleep for " + secs + " seconds.");
+		int secs = minutesBetweenScans * 60;
+		logger.info("About to sleep for " + secs + " seconds.");
 	    Thread.sleep(secs * 1000);
 	}
 
