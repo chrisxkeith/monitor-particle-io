@@ -2,7 +2,9 @@
 
 package io.verdical.monitor;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
@@ -41,7 +43,7 @@ public class UnitWatcher {
 			.indexOf("jdwp") >= 0;;
 	private final int sleepFactor = 2; // increase for slower computers.
 	private final int sleepSeconds = 10 * sleepFactor;
-			
+
 	private WebDriver driver;
 	private WebDriverWait wait;
 	
@@ -57,7 +59,6 @@ public class UnitWatcher {
 			minutesAllowedOffline = 3;
 		}
 		logger.info("Logging to " + logFileName);
-		log("Server started.");
 		unitLastConnected.put("Saha_2", null);
 		unitLastConnected.put("Saha-1", null);
 		unitLastConnected.put("JARDINIERE", null);
@@ -68,12 +69,21 @@ public class UnitWatcher {
 		unitLastConnected.put("TEST-5", null);
 	}
 
-	private String getLogFileName() throws Exception {
+	private String getHomeDir() throws Exception {
 		String d = System.getProperty("user.home");
 		if (d == null || d.length() == 0) {
 			throw new IllegalArgumentException(
 					"Unable to determine user.home directory from System.getProperty(\"user.home\")");
 		}
+		return d;
+	}
+
+	private String getCredentialsFileName() throws Exception {
+		return getHomeDir() + File.separator + "Documents" + File.separator + "particle-credentials.txt";
+	}
+
+	private String getLogFileName() throws Exception {
+		String d = getHomeDir();
 		String path = d + File.separator + "Documents" + File.separator + "Github" + File.separator
 				+ "monitor-particle-io";
 		File dir = new File(path);
@@ -199,16 +209,41 @@ public class UnitWatcher {
 		}
 	}
 
+	private void askForCredentials() throws Exception {
+		System.out.println("Enter account name.");
+		byte[] name = new byte[256];
+		System.in.read(name);
+		System.out.println("Enter account password.");
+		byte[] pw = new byte[256];
+		System.in.read(pw);
+		accountName = new String(name);
+		accountPw = new String(pw);
+	}
+
+	private void getCredentials() throws Exception {
+		String credentialsFileName = getCredentialsFileName();
+		File f = new File(credentialsFileName);
+		if (f.exists()) {
+			try {
+				BufferedReader br = new BufferedReader(new FileReader(credentialsFileName));
+				try {
+					String creds[] = br.readLine().split(" ");
+					accountName = creds[0];
+					accountPw = creds[1] + "\r\n"; // TODO : probably only works on Windows.
+				} finally {
+					br.close();
+				}
+			} catch (Exception e) {
+				askForCredentials();
+			}
+		} else {
+			askForCredentials();
+		}
+	}
+
 	public void run() {
 		try {
-			System.out.println("Enter account name.");
-			byte[] name = new byte[256];
-			System.in.read(name);
-			System.out.println("Enter account password.");
-			byte[] pw = new byte[256];
-			System.in.read(pw);
-			accountName = new String(name);
-			accountPw = new String(pw);
+			getCredentials();
 			while (true) {
 				initBrowserDriver();
 				setUpPage();
