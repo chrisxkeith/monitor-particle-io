@@ -7,6 +7,8 @@ import java.io.FileWriter;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -27,27 +29,29 @@ public class UnitWatcher {
 	
 	private static final Logger logger = Logger.getLogger(UnitWatcher.class.getName());
 
-	private static int minutesBetweenScans = 60;
+	// I have seen it take up to half an hour for an unplugged Photon to register in the Particle cloud.
+	// In production, don't scan more often than once every 30 minutes.
+	private static int minutesBetweenScans = 30;
 	private static int minutesAllowedOffline = 24 * 60;
 
 	private String accountName;
 	private String accountPw;
 
-	final boolean isDebug;
-	final int sleepFactor = 2; // increase for slower computers.
-	final int sleepSeconds = 10 * sleepFactor;
-
+	private final boolean isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
+			.indexOf("jdwp") >= 0;;
+	private final int sleepFactor = 2; // increase for slower computers.
+	private final int sleepSeconds = 10 * sleepFactor;
+			
 	private WebDriver driver;
 	private WebDriverWait wait;
 	
     private Map<String, LocalDateTime> unitLastConnected = new HashMap<String, LocalDateTime>();
 
-	final private String logFileName = getLogFileName();
-	final private SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
+	private final String logFileName = getLogFileName();
+	private final SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
+	private final LocalDateTime serverStarted = LocalDateTime.now();;
 
 	public UnitWatcher(String[] args) throws Exception {
-		isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
-				.indexOf("jdwp") >= 0;
 		if (isDebug) {
 			minutesBetweenScans = 5;
 			minutesAllowedOffline = 3;
@@ -62,7 +66,6 @@ public class UnitWatcher {
 		unitLastConnected.put("TSWE", null);
 		unitLastConnected.put("test-4a", null);
 		unitLastConnected.put("TEST-5", null);
-		unitLastConnected.put("test-NRNP2", null);
 	}
 
 	private String getLogFileName() throws Exception {
@@ -156,17 +159,27 @@ public class UnitWatcher {
 			unitLastConnected.put(name, currentTime);
 		}
 	    LocalDateTime limit = LocalDateTime.now().minusMinutes(minutesAllowedOffline);
+	    if (limit.isAfter(serverStarted)) {
+			for (String key : unitLastConnected.keySet()) {
+				if (unitLastConnected.get(key) == null) {
+					// Detect units that haven't connected since this server started.
+					unitLastConnected.put(key, serverStarted);
+				}
+			}
+	    }
 		for (String key : unitLastConnected.keySet()) {
-			StringBuilder sb = new StringBuilder(key);
 			String status = "unknown";
 			if (unitLastConnected.get(key) == null) {
 				status = "not connected yet";
 			} else if (unitLastConnected.get(key).isBefore(limit)) {
-				String d = logDateFormat.format(limit);
+				ZonedDateTime zdt = limit.atZone(ZoneId.systemDefault());
+				Date output = Date.from(zdt.toInstant());
+				String d = logDateFormat.format(output);
 				status = "disconnected since " + d;
 			} else {
 				status = "connected";
 			}
+			StringBuilder sb = new StringBuilder(key);
 			sb.append("\t").append(status);
 			log(sb.toString());
 		}
