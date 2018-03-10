@@ -182,7 +182,7 @@ public class UnitWatcher {
 			if (unitLastConnected.get(key) == null) {
 				status = "not connected yet";
 			} else if (unitLastConnected.get(key).isBefore(limit)) {
-				ZonedDateTime zdt = limit.atZone(ZoneId.systemDefault());
+				ZonedDateTime zdt = unitLastConnected.get(key).atZone(ZoneId.systemDefault());
 				Date output = Date.from(zdt.toInstant());
 				String d = logDateFormat.format(output);
 				status = "disconnected since " + d;
