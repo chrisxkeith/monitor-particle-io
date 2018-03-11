@@ -84,14 +84,13 @@ public class UnitWatcher {
 
 	private String getLogFileName() throws Exception {
 		String d = getHomeDir();
-		String path = d + File.separator + "Documents" + File.separator + "Github" + File.separator
-				+ "monitor-particle-io";
+		String path = d + File.separator + "Documents" + File.separator + "Github";
 		File dir = new File(path);
 		if (!dir.exists()) {
 			throw new IllegalArgumentException(
 					"No such directory : " + path);
 		}
-		String fn = path + File.separator + "log_" + UUID.randomUUID().toString();
+		String fn = path + File.separator + "particle_log_" + UUID.randomUUID().toString() + ".txt";
 		File f = new File(fn);
 		if (f.exists()) {
 			throw new IllegalArgumentException(
@@ -237,6 +236,7 @@ public class UnitWatcher {
 				askForCredentials();
 			}
 		} else {
+			System.out.println("No credentials file : " + credentialsFileName);
 			askForCredentials();
 		}
 	}
