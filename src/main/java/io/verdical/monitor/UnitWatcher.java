@@ -20,7 +20,10 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
+import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -54,6 +57,7 @@ public class UnitWatcher {
 	private final LocalDateTime serverStarted = LocalDateTime.now();;
 
 	public UnitWatcher(String[] args) throws Exception {
+		log("server starting up.");
 		if (isDebug) {
 			minutesBetweenScans = 5;
 			minutesAllowedOffline = 3;
@@ -90,12 +94,8 @@ public class UnitWatcher {
 			throw new IllegalArgumentException(
 					"No such directory : " + path);
 		}
-		String fn = path + File.separator + "particle_log_" + UUID.randomUUID().toString() + ".txt";
-		File f = new File(fn);
-		if (f.exists()) {
-			throw new IllegalArgumentException(
-					"File already exists : " + fn);
-		}
+		// Append to existing log file to get better long term data.
+		String fn = path + File.separator + "particle_log.txt";
 		return fn;
     }
 
@@ -241,16 +241,35 @@ public class UnitWatcher {
 		}
 	}
 
+	private void takeScreenshot() {
+		try {
+			File src = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
+			String fn = getHomeDir() + File.separator + "Documents" + File.separator + "Github" + File.separator
+					+ "screenshot_" + UUID.randomUUID().toString() + ".png";
+			FileUtils.copyFile(src, new File(fn));
+			log("takeScreenshot() : " + fn);
+		} catch (Exception e) {
+			log("takeScreenshot() exception : " + e.toString());
+		}
+	}
+
 	public void run() {
 		try {
 			getCredentials();
 			while (true) {
-				initBrowserDriver();
-				setUpPage();
-				watchUnits();
-				doSleep();
-				driver.quit();
-				driver = null;
+				try {
+					initBrowserDriver();
+					setUpPage();
+					watchUnits();
+					doSleep();
+					driver.quit();
+				} catch (Exception e) {
+					takeScreenshot();
+					log("run() : " + e.toString());
+				} finally {
+					// Try to leave previous instance of browser running for diagnostic purposes.
+					driver = null;
+				}
 			}
 		} catch (Throwable e) {
 			log("run() : " + e.toString());
