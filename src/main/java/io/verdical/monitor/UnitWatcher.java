@@ -23,6 +23,7 @@ import java.util.logging.Logger;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.OutputType;
+import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -158,13 +159,49 @@ public class UnitWatcher {
 		}
 	}
 
+	final private SimpleDateFormat googleSheetsDateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+	final private SimpleDateFormat particleDateFormatDateFormat = new SimpleDateFormat("MMM dd' 'hh:mm:ss a");
+	private String toGoogleSheetsFormat(String particleFormat) throws Exception {
+		particleFormat = particleFormat.replace("at ", " ");
+		particleFormat = particleFormat.replace("January", "Jan");
+		particleFormat = particleFormat.replace("February", "Feb");
+		particleFormat = particleFormat.replace("March", "Mar");
+		particleFormat = particleFormat.replace("April", "Apr");
+		particleFormat = particleFormat.replace("June", "Jun");
+		particleFormat = particleFormat.replace("July", "Jul");
+		particleFormat = particleFormat.replace("August", "Aug");
+		particleFormat = particleFormat.replace("September", "Sep");
+		particleFormat = particleFormat.replace("October", "Oct");
+		particleFormat = particleFormat.replace("November", "Nov");
+		particleFormat = particleFormat.replace("December", "Dec");
+		particleFormat = particleFormat.replace("nd", "");
+		particleFormat = particleFormat.replace("st", "");
+		particleFormat = particleFormat.replace("th", "");
+		Date d = particleDateFormatDateFormat.parse(particleFormat);
+		d.setYear(new Date().getYear());
+		return googleSheetsDateFormat.format(d);
+	}
+
+	Map<String, String> dataAlreadyLogged = new HashMap<String, String>();
+
 	private void monitorMessages(String deviceName) throws Exception {
 		List<WebElement> messages = driver.findElements(By.className("event-data"));
 		for (WebElement myElement : messages) {
-			WebElement parent = myElement.findElement(By.xpath(".."));
-			WebElement eventname = parent.findElement(By.className("event-name"));
-			WebElement timestamp = parent.findElement(By.className("event-timestamp"));
-			log(eventname.getText() + "\t" + myElement.getText() + "\t" + timestamp.getText() + "\t" + deviceName);
+			try {
+				WebElement parent = myElement.findElement(By.xpath(".."));
+				WebElement timestamp = parent.findElement(By.className("event-timestamp"));
+				if (dataAlreadyLogged.get(timestamp.getText()) == null) {
+					WebElement eventname = parent.findElement(By.className("event-name"));
+					log(eventname.getText() + "\t" + myElement.getText() + "\t" + toGoogleSheetsFormat(timestamp.getText())
+					+ "\t" + deviceName);
+					dataAlreadyLogged.put(timestamp.getText(), myElement.getText());
+				}
+			} catch (Exception e) {
+				// Pain in the ass browser(s)...
+				if (!e.getClass().equals(StaleElementReferenceException.class)) {
+					log("monitorMessages : " + e);
+				}
+			}
 		}
 	}
 
@@ -300,15 +337,13 @@ public class UnitWatcher {
 		}
 	}
 
-	private void monitorMsgs() throws Exception {
+	private void monitorMsgs(String deviceName) throws Exception {
 		getCredentials();
 		initBrowserDriver();
 		login();
 		Thread.sleep(5 * 1000);
 		driver.get("https://console.particle.io/devices");
 		Thread.sleep(5 * 1000);
-
-		String deviceName = "test-8EJV";
 		clickOnDevice(deviceName);
 		Thread.sleep(5 * 1000);
 		while (true) {
@@ -319,7 +354,7 @@ public class UnitWatcher {
 
 	public void run() {
 		try {
-			monitorMsgs();
+			monitorMsgs("test-8EJV");
 			// monitorDevices();
 		} catch (Throwable e) {
 			log("run() : " + e.toString());
