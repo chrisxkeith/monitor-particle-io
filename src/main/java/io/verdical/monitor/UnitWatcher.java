@@ -36,8 +36,10 @@ public class UnitWatcher {
 
 	// I have seen it take up to half an hour for an unplugged Photon to register in the Particle cloud.
 	// In production, don't scan more often than once every 30 minutes.
-	private static int minutesBetweenScans = 30;
+	private static int minutesBetweenDeviceScans = 30;
 	private static int minutesAllowedOffline = 24 * 60;
+
+	private static int minutesBetweenMessageScans = 15;
 
 	private String accountName;
 	private String accountPw;
@@ -59,7 +61,8 @@ public class UnitWatcher {
 	public UnitWatcher(String[] args) throws Exception {
 		log("server starting up.");
 		if (isDebug) {
-			minutesBetweenScans = 5;
+			minutesBetweenDeviceScans = 5;
+			minutesBetweenMessageScans = 1;
 			minutesAllowedOffline = 3;
 		}
 		logger.info("Logging to " + logFileName);
@@ -114,7 +117,7 @@ public class UnitWatcher {
 		}
 	}
 
-	private void setUpPage() throws Exception {
+	private void login() throws Exception {
 		driver.get("https://build.particle.io/");
 		Thread.sleep(2 * 1000);
 		WebElement name = driver.findElement(By.name("username"));
@@ -122,17 +125,20 @@ public class UnitWatcher {
 		Thread.sleep(2 * 1000);
 		WebElement pw = driver.findElement(By.name("password"));
 		pw.sendKeys(accountPw);
-		goToDevices();
+	}
+
+	private void goToTool(String className) throws Exception {
+		try {
+			wait.until(ExpectedConditions.elementToBeClickable(By.className(className)));
+			WebElement devicesEl = driver.findElement(By.className(className));
+			devicesEl.click();
+		} catch (Exception e) {
+			throw new Exception("Error waiting for elementToBeClickable By.className(\"" + className + "\"). Are you logged into build.particle.io?");
+		}
 	}
 
 	private void goToDevices() throws Exception {
-		try {
-			wait.until(ExpectedConditions.elementToBeClickable(By.className("ion-pinpoint")));
-			WebElement devicesEl = driver.findElement(By.className("ion-pinpoint"));
-			devicesEl.click();
-		} catch (Exception e) {
-			throw new Exception("Error waiting for elementToBeClickable By.className(\"ion-pinpoint\"). Are you logged into build.particle.io?");
-		}
+		goToTool("ion-pinpoint");
 		try {
 			wait.until(ExpectedConditions.elementToBeClickable(By.className("newcore")));
 		} catch (Exception e) {
@@ -152,7 +158,18 @@ public class UnitWatcher {
 		}
 	}
 
+	private void monitorMessages(String deviceName) throws Exception {
+		List<WebElement> messages = driver.findElements(By.className("event-data"));
+		for (WebElement myElement : messages) {
+			WebElement parent = myElement.findElement(By.xpath(".."));
+			WebElement eventname = parent.findElement(By.className("event-name"));
+			WebElement timestamp = parent.findElement(By.className("event-timestamp"));
+			log(eventname.getText() + "\t" + myElement.getText() + "\t" + timestamp.getText() + "\t" + deviceName);
+		}
+	}
+
 	private void watchUnits() throws Exception {
+		goToDevices();
 	    LocalDateTime currentTime = LocalDateTime.now();
 	    List<String> unitsAlive = new ArrayList<String>();
 
@@ -194,8 +211,8 @@ public class UnitWatcher {
 		}
 	}
 
-	private void doSleep() throws Exception {
-		int secs = minutesBetweenScans * 60;
+	private void doSleep(int nMinutes) throws Exception {
+		int secs = nMinutes * 60;
 		logger.info("About to sleep for " + secs + " seconds.");
 	    Thread.sleep(secs * 1000);
 	}
@@ -253,24 +270,57 @@ public class UnitWatcher {
 		}
 	}
 
+	@SuppressWarnings("unused")
+	private void monitorDevices() {
+		while (true) {
+			try {
+				initBrowserDriver();
+				login();
+				watchUnits();
+				doSleep(minutesBetweenDeviceScans);
+				driver.quit();
+			} catch (Exception e) {
+				takeScreenshot();
+				log("run() : " + e.toString());
+			} finally {
+				// Try to leave previous instance of browser running for diagnostic purposes.
+				driver = null;
+			}
+		}
+	}
+
+	private void clickOnDevice(String deviceName) {
+		List<WebElement> devices = driver.findElements(By.className("device"));
+		for (WebElement myElement : devices) {
+			WebElement name = myElement.findElement(By.className("device-name"));
+			if (name.getText().equals(deviceName)) {
+				name.click();
+				break;
+			}
+		}
+	}
+
+	private void monitorMsgs() throws Exception {
+		getCredentials();
+		initBrowserDriver();
+		login();
+		Thread.sleep(5 * 1000);
+		driver.get("https://console.particle.io/devices");
+		Thread.sleep(5 * 1000);
+
+		String deviceName = "test-8EJV";
+		clickOnDevice(deviceName);
+		Thread.sleep(5 * 1000);
+		while (true) {
+			monitorMessages(deviceName);
+			doSleep(minutesBetweenMessageScans);
+		}
+	}
+
 	public void run() {
 		try {
-			getCredentials();
-			while (true) {
-				try {
-					initBrowserDriver();
-					setUpPage();
-					watchUnits();
-					doSleep();
-					driver.quit();
-				} catch (Exception e) {
-					takeScreenshot();
-					log("run() : " + e.toString());
-				} finally {
-					// Try to leave previous instance of browser running for diagnostic purposes.
-					driver = null;
-				}
-			}
+			monitorMsgs();
+			// monitorDevices();
 		} catch (Throwable e) {
 			log("run() : " + e.toString());
 			driver = null;
