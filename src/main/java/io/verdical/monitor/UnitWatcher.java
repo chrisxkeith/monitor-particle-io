@@ -177,6 +177,7 @@ public class UnitWatcher {
 		particleFormat = particleFormat.replace("nd", "");
 		particleFormat = particleFormat.replace("st", "");
 		particleFormat = particleFormat.replace("th", "");
+		particleFormat = particleFormat.replace("rd", "");
 		Date d = particleDateFormatDateFormat.parse(particleFormat);
 		d.setYear(new Date().getYear());
 		return googleSheetsDateFormat.format(d);
