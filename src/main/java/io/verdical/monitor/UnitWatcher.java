@@ -178,7 +178,7 @@ public class UnitWatcher {
 		particleFormat = particleFormat.replace("st", "");
 		particleFormat = particleFormat.replace("th", "");
 		particleFormat = particleFormat.replace("rd", "");
-		particleFormat = particleFormat.replace("  ", " 0");
+		particleFormat = particleFormat.replace("  ", " ");
 		particleFormat = particleFormat.replace("am", "AM");
 		particleFormat = particleFormat.replace("pm", "PM");
 		particleFormat = LocalDateTime.now().getYear() + "-" + particleFormat;
