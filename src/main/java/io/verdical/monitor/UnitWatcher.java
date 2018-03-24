@@ -11,8 +11,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,7 +105,7 @@ public class UnitWatcher {
 
 	private void log(String s) {
 		logger.info(s);
-		String d = logDateFormat.format(new Date());
+		String d = logDateFormat.format(new java.util.Date());
 		try {
 			String msg = d + "\t" + s;
 			System.out.println(msg);
@@ -159,9 +159,9 @@ public class UnitWatcher {
 		}
 	}
 
-	final private SimpleDateFormat googleSheetsDateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-	final private SimpleDateFormat particleDateFormatDateFormat = new SimpleDateFormat("MMM dd' 'hh:mm:ss a");
-	private String toGoogleSheetsFormat(String particleFormat) throws Exception {
+	final private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MMM dd hh:mm:ss a");
+
+	private LocalDateTime toDate(String particleFormat) throws Exception {
 		particleFormat = particleFormat.replace("at ", " ");
 		particleFormat = particleFormat.replace("January", "Jan");
 		particleFormat = particleFormat.replace("February", "Feb");
@@ -178,12 +178,15 @@ public class UnitWatcher {
 		particleFormat = particleFormat.replace("st", "");
 		particleFormat = particleFormat.replace("th", "");
 		particleFormat = particleFormat.replace("rd", "");
-		Date d = particleDateFormatDateFormat.parse(particleFormat);
-		d.setYear(new Date().getYear());
-		return googleSheetsDateFormat.format(d);
+		particleFormat = particleFormat.replace("  ", " 0");
+		particleFormat = particleFormat.replace("am", "AM");
+		particleFormat = particleFormat.replace("pm", "PM");
+		particleFormat = LocalDateTime.now().getYear() + "-" + particleFormat;
+		return LocalDateTime.parse(particleFormat, formatter);
 	}
 
-	Map<String, String> dataAlreadyLogged = new HashMap<String, String>();
+	final private DateTimeFormatter googleSheetsDateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+	private Map<String, String> dataAlreadyLogged = new HashMap<String, String>();
 
 	private void monitorMessages(String deviceName) throws Exception {
 		List<WebElement> messages = driver.findElements(By.className("event-data"));
@@ -193,8 +196,11 @@ public class UnitWatcher {
 				WebElement timestamp = parent.findElement(By.className("event-timestamp"));
 				if (dataAlreadyLogged.get(timestamp.getText()) == null) {
 					WebElement eventname = parent.findElement(By.className("event-name"));
-					log(eventname.getText() + "\t" + myElement.getText() + "\t" + toGoogleSheetsFormat(timestamp.getText())
-					+ "\t" + deviceName);
+					LocalDateTime d = toDate(timestamp.getText());
+					log(eventname.getText()
+							+ "\t" + myElement.getText()
+							+ "\t" + googleSheetsDateFormat.format(d)
+							+ "\t" + deviceName);
 					dataAlreadyLogged.put(timestamp.getText(), myElement.getText());
 				}
 			} catch (Exception e) {
@@ -237,7 +243,8 @@ public class UnitWatcher {
 				status = "not connected yet";
 			} else if (unitLastConnected.get(key).isBefore(limit)) {
 				ZonedDateTime zdt = unitLastConnected.get(key).atZone(ZoneId.systemDefault());
-				Date output = Date.from(zdt.toInstant());
+				// TODO : convert to java.time.LocalDateTime if we need this code again.
+				java.util.Date output = java.util.Date.from(zdt.toInstant());
 				String d = logDateFormat.format(output);
 				status = "disconnected since " + d;
 			} else {
@@ -338,8 +345,7 @@ public class UnitWatcher {
 		}
 	}
 
-	private void monitorMsgs(String deviceName) throws Exception {
-		getCredentials();
+	private LocalDateTime goToDevice(String deviceName) throws Exception {
 		initBrowserDriver();
 		login();
 		Thread.sleep(5 * 1000);
@@ -347,8 +353,21 @@ public class UnitWatcher {
 		Thread.sleep(5 * 1000);
 		clickOnDevice(deviceName);
 		Thread.sleep(5 * 1000);
+		return LocalDateTime.now();
+	}
+
+	private void monitorMsgs(String deviceName) throws Exception {
+		getCredentials();
+		LocalDateTime mostRecent = goToDevice(deviceName);
 		while (true) {
 			monitorMessages(deviceName);
+			Duration d = Duration.between(LocalDateTime.now(), mostRecent);
+			if (d.getSeconds() > 60 * 60) {
+				// Web page stops updating after a while. Restart it after an hour.
+				driver.quit();
+				driver = null;
+				mostRecent = goToDevice(deviceName);
+			}
 			doSleep(minutesBetweenMessageScans);
 		}
 	}
@@ -358,7 +377,7 @@ public class UnitWatcher {
 			monitorMsgs("test-8EJV");
 			// monitorDevices();
 		} catch (Throwable e) {
-			log("run() : " + e.toString());
+			log("run() : " + e.getClass().getName() + " " + e.getMessage());
 			driver = null;
 		} finally {
 			if (driver != null) {
@@ -372,7 +391,7 @@ public class UnitWatcher {
 		try {
 			new UnitWatcher(args).run();
 		} catch (Exception e) {
-			System.out.println(new Date().toString() + "\t" + e.getMessage());
+			System.out.println("main() : " + LocalDateTime.now().toString() + "\t" + e.getClass().getName() + " " + e.getMessage());
 		}
 	}
 }
