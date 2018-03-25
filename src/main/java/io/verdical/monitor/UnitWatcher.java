@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -159,30 +160,66 @@ public class UnitWatcher {
 		}
 	}
 
-	final private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MMM dd hh:mm:ss a");
+	// java.time.Date parsing works differently from java.util.Date.
+	// Run some tests to figure it out.
+	@SuppressWarnings("unused")
+	private void testParsing() {
+		String[] digits = {"8", "08"};
+		for (String hour : digits) {
+			String[] days = {"4", "10"};
+			for (String day : days) {
+				String input = "March " + day + "th at " + hour + ":50:11 AM";
+				// March 25th at 9:25:36 am
+				try {
+					toDate(input);
+					System.out.println("Pass : " + input);
+				} catch (Exception e) {
+					System.out.println("FAIL : " + input + " : " + e.getMessage());
+				}
+			}
+		}
+	}
+
+	final private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'hh:mm:ss' 'a");
 
 	private LocalDateTime toDate(String particleFormat) throws Exception {
-		particleFormat = particleFormat.replace("at ", " ");
-		particleFormat = particleFormat.replace("January", "Jan");
-		particleFormat = particleFormat.replace("February", "Feb");
-		particleFormat = particleFormat.replace("March", "Mar");
-		particleFormat = particleFormat.replace("April", "Apr");
-		particleFormat = particleFormat.replace("June", "Jun");
-		particleFormat = particleFormat.replace("July", "Jul");
-		particleFormat = particleFormat.replace("August", "Aug");
-		particleFormat = particleFormat.replace("September", "Sep");
-		particleFormat = particleFormat.replace("October", "Oct");
-		particleFormat = particleFormat.replace("November", "Nov");
-		particleFormat = particleFormat.replace("December", "Dec");
+		String input = particleFormat;
+		particleFormat = particleFormat.replace(" at ", "T");
+		particleFormat = particleFormat.replace("January ", "01-");
+		particleFormat = particleFormat.replace("February ", "02-");
+		particleFormat = particleFormat.replace("March ", "03-");
+		particleFormat = particleFormat.replace("April ", "04-");
+		particleFormat = particleFormat.replace("May ", "05-");
+		particleFormat = particleFormat.replace("June ", "06-");
+		particleFormat = particleFormat.replace("July ", "07-");
+		particleFormat = particleFormat.replace("August ", "08-");
+		particleFormat = particleFormat.replace("September ", "09-");
+		particleFormat = particleFormat.replace("October ", "10-");
+		particleFormat = particleFormat.replace("November ", "11-");
+		particleFormat = particleFormat.replace("December ", "12-");
 		particleFormat = particleFormat.replace("nd", "");
 		particleFormat = particleFormat.replace("st", "");
 		particleFormat = particleFormat.replace("th", "");
 		particleFormat = particleFormat.replace("rd", "");
-		particleFormat = particleFormat.replace("  ", " ");
 		particleFormat = particleFormat.replace("am", "AM");
 		particleFormat = particleFormat.replace("pm", "PM");
 		particleFormat = LocalDateTime.now().getYear() + "-" + particleFormat;
-		return LocalDateTime.parse(particleFormat, formatter);
+		if (particleFormat.charAt(9) == 'T') {
+			String prefix = particleFormat.substring(0, 8);
+			String suffix = particleFormat.substring(8);
+			particleFormat = prefix + "0" + suffix;
+		}
+		if (particleFormat.charAt(12) == ':') {
+			particleFormat = particleFormat.replace("T", "T0");
+		}
+		try {
+			return LocalDateTime.parse(particleFormat, formatter);
+		} catch (Exception e) {
+			System.out.println("input:          " + input);
+			System.out.println("particleFormat: " + particleFormat);
+			System.out.println(formatter);
+			throw e;
+		}
 	}
 
 	final private DateTimeFormatter googleSheetsDateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
@@ -374,6 +411,7 @@ public class UnitWatcher {
 
 	public void run() {
 		try {
+			// testParsing();
 			monitorMsgs("test-8EJV");
 			// monitorDevices();
 		} catch (Throwable e) {
