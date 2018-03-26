@@ -44,6 +44,7 @@ public class UnitWatcher {
 
 	private String accountName;
 	private String accountPw;
+	private String deviceName;
 
 	private final boolean isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
 			.indexOf("jdwp") >= 0;;
@@ -329,6 +330,11 @@ public class UnitWatcher {
 					String creds[] = br.readLine().split(" ");
 					accountName = creds[0];
 					accountPw = creds[1] + "\r\n"; // TODO : probably only works on Windows.
+					if (creds.length > 2) {
+						deviceName = creds[2];
+					} else {
+						deviceName = "test-8EJV";
+					}
 				} finally {
 					br.close();
 				}
@@ -378,9 +384,11 @@ public class UnitWatcher {
 			WebElement name = myElement.findElement(By.className("device-name"));
 			if (name.getText().equals(deviceName)) {
 				name.click();
-				break;
+				return;
 			}
 		}
+		log("Unable to find unit named : " + deviceName);
+		System.exit(-6);
 	}
 
 	private LocalDateTime goToDevice(String deviceName) throws Exception {
@@ -394,7 +402,7 @@ public class UnitWatcher {
 		return LocalDateTime.now();
 	}
 
-	private void monitorMsgs(String deviceName) throws Exception {
+	private void monitorMsgs() throws Exception {
 		getCredentials();
 		LocalDateTime mostRecent = goToDevice(deviceName);
 		while (true) {
@@ -413,7 +421,7 @@ public class UnitWatcher {
 	public void run() {
 		try {
 			// testParsing();
-			monitorMsgs("test-8EJV");
+			monitorMsgs();
 			// monitorDevices();
 		} catch (Throwable e) {
 			log("run() : " + e.getClass().getName() + " " + e.getMessage());
