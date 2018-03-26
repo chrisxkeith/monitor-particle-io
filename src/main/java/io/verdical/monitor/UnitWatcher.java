@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -68,14 +67,16 @@ public class UnitWatcher {
 			minutesAllowedOffline = 3;
 		}
 		logger.info("Logging to " + logFileName);
+		unitLastConnected.put("bobcat_pizza", null);
+		unitLastConnected.put("CatDev", null);
+		unitLastConnected.put("JARDINIERE", null);
+		unitLastConnected.put("MCDS-ver_2", null);
+		unitLastConnected.put("PMH-1", null);
 		unitLastConnected.put("Saha_2", null);
 		unitLastConnected.put("Saha-1", null);
-		unitLastConnected.put("JARDINIERE", null);
-		unitLastConnected.put("bobcat_pizza", null);
-		unitLastConnected.put("MCDS-ver_2", null);
-		unitLastConnected.put("TSWE", null);
 		unitLastConnected.put("test-4a", null);
-		unitLastConnected.put("TEST-5", null);
+		unitLastConnected.put("test-8EJV", null);
+		unitLastConnected.put("TSWE", null);
 	}
 
 	private String getHomeDir() throws Exception {
