@@ -31,7 +31,7 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-public class UnitWatcher {
+public class UnitWatcher extends Thread {
 	
 	private static final Logger logger = Logger.getLogger(UnitWatcher.class.getName());
 
@@ -56,12 +56,18 @@ public class UnitWatcher {
 	
     private Map<String, LocalDateTime> unitLastConnected = new HashMap<String, LocalDateTime>();
 
-	private final String logFileName = getLogFileName();
+	private String logFileName;
 	private final SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
 	private final LocalDateTime serverStarted = LocalDateTime.now();;
 
-	public UnitWatcher(String[] args) throws Exception {
-		log("server starting up.");
+	public UnitWatcher(String creds) throws Exception {
+		setCredentials(creds);
+		logFileName = getLogFileName();
+		init();
+	}
+
+	private void init() throws Exception {
+		log(deviceName + " : server starting up.");
 		if (isDebug) {
 			minutesBetweenDeviceScans = 5;
 			minutesBetweenMessageScans = 1;
@@ -80,7 +86,7 @@ public class UnitWatcher {
 		unitLastConnected.put("TSWE", null);
 	}
 
-	private String getHomeDir() throws Exception {
+	private static String getHomeDir() throws Exception {
 		String d = System.getProperty("user.home");
 		if (d == null || d.length() == 0) {
 			throw new IllegalArgumentException(
@@ -89,7 +95,7 @@ public class UnitWatcher {
 		return d;
 	}
 
-	private String getCredentialsFileName() throws Exception {
+	private static String getCredentialsFileName() throws Exception {
 		return getHomeDir() + File.separator + "Documents" + File.separator + "particle-credentials.txt";
 	}
 
@@ -102,8 +108,7 @@ public class UnitWatcher {
 					"No such directory : " + path);
 		}
 		// Append to existing log file to get better long term data.
-		String fn = path + File.separator + "particle_log.txt";
-		return fn;
+		return path + File.separator + deviceName + "_particle_log.txt";
     }
 
 	private void log(String s) {
@@ -238,8 +243,8 @@ public class UnitWatcher {
 				if (dataAlreadyLogged.get(key) == null) {
 					LocalDateTime d = toDate(timestamp.getText());
 					log(eventname.getText()
-							+ "\t" + myElement.getText()
 							+ "\t" + googleSheetsDateFormat.format(d)
+							+ "\t" + myElement.getText()
 							+ "\t" + deviceName);
 					dataAlreadyLogged.put(key, myElement.getText());
 				}
@@ -310,42 +315,30 @@ public class UnitWatcher {
 		}
 	}
 
-	private void askForCredentials() throws Exception {
-		System.out.println("Enter account name.");
-		byte[] name = new byte[256];
-		System.in.read(name);
-		System.out.println("Enter account password.");
-		byte[] pw = new byte[256];
-		System.in.read(pw);
-		accountName = new String(name);
-		accountPw = new String(pw);
-	}
-
-	private void getCredentials() throws Exception {
+	private static String[] readCredentials() throws Exception {
 		String credentialsFileName = getCredentialsFileName();
 		File f = new File(credentialsFileName);
-		if (f.exists()) {
-			try {
-				BufferedReader br = new BufferedReader(new FileReader(credentialsFileName));
-				try {
-					String creds[] = br.readLine().split(" ");
-					accountName = creds[0];
-					accountPw = creds[1] + "\r\n"; // TODO : probably only works on Windows.
-					if (creds.length > 2) {
-						deviceName = creds[2];
-					} else {
-						deviceName = "test-8EJV";
-					}
-				} finally {
-					br.close();
-				}
-			} catch (Exception e) {
-				askForCredentials();
-			}
-		} else {
+		if (!f.exists()) {
 			System.out.println("No credentials file : " + credentialsFileName);
-			askForCredentials();
+			System.exit(-7);
 		}
+		String[] creds = new String[10];
+		BufferedReader br = new BufferedReader(new FileReader(credentialsFileName));
+		try {
+			for (int i = 0; i < 10; i++) {
+				creds[i++] = br.readLine();
+			}
+		} finally {
+			br.close();
+		}
+		return creds;
+	}
+
+	private void setCredentials(String c) {
+		String creds[] = c.split(" ");
+		accountName = creds[0];
+		accountPw = creds[1] + "\r\n"; // TODO : probably only works on Windows.
+		deviceName = creds[2];
 	}
 
 	private void takeScreenshot() {
@@ -404,7 +397,6 @@ public class UnitWatcher {
 	}
 
 	private void monitorMsgs() throws Exception {
-		getCredentials();
 		LocalDateTime mostRecent = goToDevice(deviceName);
 		while (true) {
 			monitorMessages(deviceName);
@@ -437,7 +429,12 @@ public class UnitWatcher {
 
 	public static void main(String[] args) {
 		try {
-			new UnitWatcher(args).run();
+			String[] creds = readCredentials();
+			for (String c : creds) {
+				if (c != null) {
+					 (new UnitWatcher(c)).start();
+				}
+			}
 		} catch (Exception e) {
 			System.out.println("main() : " + LocalDateTime.now().toString() + "\t" + e.getClass().getName() + " " + e.getMessage());
 		}
