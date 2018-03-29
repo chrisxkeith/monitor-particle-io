@@ -233,14 +233,15 @@ public class UnitWatcher {
 			try {
 				WebElement parent = myElement.findElement(By.xpath(".."));
 				WebElement timestamp = parent.findElement(By.className("event-timestamp"));
-				if (dataAlreadyLogged.get(timestamp.getText()) == null) {
-					WebElement eventname = parent.findElement(By.className("event-name"));
+				WebElement eventname = parent.findElement(By.className("event-name"));
+				String key = eventname.getText() + "_" + timestamp.getText();
+				if (dataAlreadyLogged.get(key) == null) {
 					LocalDateTime d = toDate(timestamp.getText());
 					log(eventname.getText()
 							+ "\t" + myElement.getText()
 							+ "\t" + googleSheetsDateFormat.format(d)
 							+ "\t" + deviceName);
-					dataAlreadyLogged.put(timestamp.getText(), myElement.getText());
+					dataAlreadyLogged.put(key, myElement.getText());
 				}
 			} catch (Exception e) {
 				// Pain in the ass browser(s)...
