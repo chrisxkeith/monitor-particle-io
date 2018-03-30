@@ -303,7 +303,7 @@ public class UnitWatcher extends Thread {
 
 	private void doSleep(int nMinutes) throws Exception {
 		int secs = nMinutes * 60;
-		logger.info("About to sleep for " + secs + " seconds.");
+		logger.info(deviceName + " : About to sleep for " + secs + " seconds.");
 	    Thread.sleep(secs * 1000);
 	}
 
@@ -393,6 +393,7 @@ public class UnitWatcher extends Thread {
 		Thread.sleep(5 * 1000);
 		clickOnDevice(deviceName);
 		Thread.sleep(5 * 1000);
+		log(deviceName + " : Started browser");
 		return LocalDateTime.now();
 	}
 
