@@ -40,11 +40,10 @@ public class UnitWatcher extends Thread {
 	private static int minutesBetweenDeviceScans = 30;
 	private static int minutesAllowedOffline = 24 * 60;
 
-	private static int minutesBetweenMessageScans = 15;
-
 	private String accountName;
 	private String accountPw;
 	private String deviceName;
+	private Integer expectedIntervalInMinutes;
 
 	private final boolean isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
 			.indexOf("jdwp") >= 0;;
@@ -70,7 +69,6 @@ public class UnitWatcher extends Thread {
 		log(deviceName + " : server starting up.");
 		if (isDebug) {
 			minutesBetweenDeviceScans = 5;
-			minutesBetweenMessageScans = 1;
 			minutesAllowedOffline = 3;
 		}
 		logger.info("Logging to " + logFileName);
@@ -232,14 +230,22 @@ public class UnitWatcher extends Thread {
 	final private DateTimeFormatter googleSheetsDateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
 	private Map<String, String> dataAlreadyLogged = new HashMap<String, String>();
 
-	private void monitorMessages(String deviceName) throws Exception {
+	private LocalDateTime monitorMessages(String deviceName) throws Exception {
+		LocalDateTime mostRecent = null;
+		for (String key : dataAlreadyLogged.keySet()) {
+			String[] vals = key.split("!");
+			LocalDateTime d = toDate(vals[1]);
+			if ((mostRecent == null) || (mostRecent.isBefore(d))) {
+				mostRecent = d;
+			}
+		}
 		List<WebElement> messages = driver.findElements(By.className("event-data"));
 		for (WebElement myElement : messages) {
 			try {
 				WebElement parent = myElement.findElement(By.xpath(".."));
 				WebElement timestamp = parent.findElement(By.className("event-timestamp"));
 				WebElement eventname = parent.findElement(By.className("event-name"));
-				String key = eventname.getText() + "_" + timestamp.getText();
+				String key = eventname.getText() + "!" + timestamp.getText();
 				if (dataAlreadyLogged.get(key) == null) {
 					LocalDateTime d = toDate(timestamp.getText());
 					log(eventname.getText()
@@ -247,6 +253,9 @@ public class UnitWatcher extends Thread {
 							+ "\t" + myElement.getText()
 							+ "\t" + deviceName);
 					dataAlreadyLogged.put(key, myElement.getText());
+					if ((mostRecent == null) || (mostRecent.isBefore(d))) {
+						mostRecent = d;
+					}
 				}
 			} catch (Exception e) {
 				// Pain in the ass browser(s)...
@@ -255,6 +264,7 @@ public class UnitWatcher extends Thread {
 				}
 			}
 		}
+		return mostRecent;
 	}
 
 	private void watchUnits() throws Exception {
@@ -303,7 +313,7 @@ public class UnitWatcher extends Thread {
 
 	private void doSleep(int nMinutes) throws Exception {
 		int secs = nMinutes * 60;
-		logger.info(deviceName + " : About to sleep for " + secs + " seconds.");
+		logger.info(deviceName + " : About to sleep for " + nMinutes + " minutes.");
 	    Thread.sleep(secs * 1000);
 	}
 
@@ -336,9 +346,14 @@ public class UnitWatcher extends Thread {
 
 	private void setCredentials(String c) {
 		String creds[] = c.split(" ");
+		if ((creds == null) || (creds.length < 4)) {
+			System.out.println("bad input, expected : accountName accountPw deviceName expectedIntervalInMinutes");
+			System.exit(-8);
+		}
 		accountName = creds[0];
 		accountPw = creds[1] + "\r\n"; // TODO : probably only works on Windows.
 		deviceName = creds[2];
+		expectedIntervalInMinutes = Integer.parseInt(creds[3]);
 	}
 
 	private void takeScreenshot() {
@@ -385,7 +400,7 @@ public class UnitWatcher extends Thread {
 		System.exit(-6);
 	}
 
-	private LocalDateTime goToDevice(String deviceName) throws Exception {
+	private void goToDevice(String deviceName) throws Exception {
 		initBrowserDriver();
 		login();
 		Thread.sleep(5 * 1000);
@@ -394,21 +409,25 @@ public class UnitWatcher extends Thread {
 		clickOnDevice(deviceName);
 		Thread.sleep(5 * 1000);
 		log(deviceName + " : Started browser");
-		return LocalDateTime.now();
 	}
 
 	private void monitorMsgs() throws Exception {
-		LocalDateTime mostRecent = goToDevice(deviceName);
+		goToDevice(deviceName);
 		while (true) {
-			monitorMessages(deviceName);
-			Duration d = Duration.between(LocalDateTime.now(), mostRecent);
-			if (d.getSeconds() > 60 * 60) {
-				// Web page stops updating after a while. Restart it after an hour.
-				driver.quit();
-				driver = null;
-				mostRecent = goToDevice(deviceName);
+			LocalDateTime mostRecent = monitorMessages(deviceName);
+			if (mostRecent != null) {
+				Duration d = Duration.between(LocalDateTime.now(), mostRecent);
+				
+				// Would be nice to not have to wait 2 intervals,
+				// but we can't count on the clocks on all the machines being in sync.
+				if (d.getSeconds() > 2 * expectedIntervalInMinutes * 60) {
+					// Web page randomly stops updating. Restart it.
+					driver.quit();
+					driver = null;
+					goToDevice(deviceName);
+				}
 			}
-			doSleep(minutesBetweenMessageScans);
+			doSleep(isDebug ? 1 : (2 * expectedIntervalInMinutes));
 		}
 	}
 
