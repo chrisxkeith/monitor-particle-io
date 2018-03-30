@@ -416,7 +416,7 @@ public class UnitWatcher extends Thread {
 		while (true) {
 			LocalDateTime mostRecent = monitorMessages(deviceName);
 			if (mostRecent != null) {
-				Duration d = Duration.between(LocalDateTime.now(), mostRecent);
+				Duration d = Duration.between(mostRecent, LocalDateTime.now());
 				
 				// Would be nice to not have to wait 2 intervals,
 				// but we can't count on the clocks on all the machines being in sync.
@@ -427,7 +427,7 @@ public class UnitWatcher extends Thread {
 					goToDevice(deviceName);
 				}
 			}
-			doSleep(isDebug ? 1 : (2 * expectedIntervalInMinutes));
+			doSleep(2 * expectedIntervalInMinutes);
 		}
 	}
 
