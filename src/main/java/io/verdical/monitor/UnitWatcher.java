@@ -248,8 +248,8 @@ public class UnitWatcher extends Thread {
 				String key = eventname.getText() + "!" + timestamp.getText();
 				if (dataAlreadyLogged.get(key) == null) {
 					LocalDateTime d = toDate(timestamp.getText());
-					log(eventname.getText()
-							+ "\t" + googleSheetsDateFormat.format(d)
+					log(googleSheetsDateFormat.format(d)
+							+ "\t" + eventname.getText()
 							+ "\t" + myElement.getText()
 							+ "\t" + deviceName);
 					dataAlreadyLogged.put(key, myElement.getText());
