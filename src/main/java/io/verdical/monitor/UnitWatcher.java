@@ -44,6 +44,7 @@ public class UnitWatcher extends Thread {
 	private String accountPw;
 	private String deviceName;
 	private Integer expectedIntervalInMinutes;
+	private List<String> sensorNames = new ArrayList<String>();
 
 	private final boolean isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
 			.indexOf("jdwp") >= 0;;
@@ -57,7 +58,7 @@ public class UnitWatcher extends Thread {
 
 	private String logFileName;
 	private final SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
-	private final LocalDateTime serverStarted = LocalDateTime.now();;
+	private final LocalDateTime serverStarted = LocalDateTime.now();
 
 	public UnitWatcher(String creds) throws Exception {
 		setCredentials(creds);
@@ -109,19 +110,22 @@ public class UnitWatcher extends Thread {
 		return path + File.separator + deviceName + "_particle_log.txt";
     }
 
-	private void log(String s) {
+	private void logRaw(String s) {
 		logger.info(s);
-		String d = logDateFormat.format(new java.util.Date());
 		try {
-			String msg = d + "\t" + s;
-			System.out.println(msg);
+			System.out.println(s);
 			FileWriter fstream = new FileWriter(logFileName, true);
-			fstream.write(msg + System.getProperty("line.separator"));
+			fstream.write(s + System.getProperty("line.separator"));
 			fstream.close();
 		} catch (Exception e) {
 			System.out
-					.println(d + "\tError writing log file : " + logFileName + "\t" + e.toString());
+					.println(s + "\tError writing log file : " + logFileName + "\t" + e.toString());
 		}
+	}
+
+	private void log(String s) {
+		String d = logDateFormat.format(new java.util.Date());
+		logRaw(d + "\t" + s);
 	}
 
 	private void login() throws Exception {
@@ -227,7 +231,38 @@ public class UnitWatcher extends Thread {
 		}
 	}
 
+	// TODO : only works for one sensor currently.
+	@SuppressWarnings("unused")
+	private void logForGSheet(String dateStr, String eventName, String value) {
+		boolean found = false;
+		for (String s : sensorNames) {
+			if (s.equals(eventName)) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			StringBuilder sb = new StringBuilder("\t");
+			sb.append(eventName);
+			logRaw(sb.toString());
+			sensorNames.add(eventName);
+		}
+		StringBuilder sb = new StringBuilder(dateStr);
+		sb.append("\t")
+				.append(value);
+		logRaw(sb.toString());
+	}
+
 	final private DateTimeFormatter googleSheetsDateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+	private void doLog(LocalDateTime d, String eventName, String value, String deviceName) {
+		String dateStr = googleSheetsDateFormat.format(d);
+		log(dateStr
+				+ "\t" + eventName
+				+ "\t" + value
+				+ "\t" + deviceName);
+//		logForGSheet(dateStr, eventName, value);
+	}
+
 	private Map<String, String> dataAlreadyLogged = new HashMap<String, String>();
 
 	private LocalDateTime monitorMessages(String deviceName) throws Exception {
@@ -248,10 +283,7 @@ public class UnitWatcher extends Thread {
 				String key = eventname.getText() + "!" + timestamp.getText();
 				if (dataAlreadyLogged.get(key) == null) {
 					LocalDateTime d = toDate(timestamp.getText());
-					log(googleSheetsDateFormat.format(d)
-							+ "\t" + eventname.getText()
-							+ "\t" + myElement.getText()
-							+ "\t" + deviceName);
+					doLog(d, eventname.getText(), myElement.getText(), deviceName);
 					dataAlreadyLogged.put(key, myElement.getText());
 					if ((mostRecent == null) || (mostRecent.isBefore(d))) {
 						mostRecent = d;
