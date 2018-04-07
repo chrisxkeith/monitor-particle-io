@@ -361,7 +361,8 @@ public class UnitWatcher extends Thread {
 	private boolean setCredentials(String c) {
 		String creds[] = c.split(" ");
 		if ((creds == null) || (creds.length != 4)) {
-			System.out.println("bad input, expected : accountName accountPw deviceName expectedIntervalInMinutes");
+			System.out.println("bad input : " + c);
+			System.out.println("expected : accountName accountPw deviceName expectedIntervalInMinutes");
 			return false;
 		}
 		accountName = creds[0];
@@ -472,6 +473,7 @@ public class UnitWatcher extends Thread {
 			monitorMsgs();
 			// monitorDevices();
 		} catch (Throwable e) {
+			// TODO : display stack also.
 			log("run() : " + e.getClass().getName() + " " + e.getMessage());
 			driver = null;
 		} finally {
