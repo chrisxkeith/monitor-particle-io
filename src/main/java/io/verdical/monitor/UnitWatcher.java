@@ -14,8 +14,10 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -44,7 +46,7 @@ public class UnitWatcher extends Thread {
 	private String accountPw;
 	private String deviceName;
 	private Integer expectedIntervalInMinutes;
-	private List<String> sensorNames = new ArrayList<String>();
+	private Map<String, String> sensorNames = new HashMap<String, String>();
 
 	private final boolean isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
 			.indexOf("jdwp") >= 0;;
@@ -231,28 +233,6 @@ public class UnitWatcher extends Thread {
 		}
 	}
 
-	// TODO : only works for one sensor currently.
-	@SuppressWarnings("unused")
-	private void logForGSheet(String dateStr, String eventName, String value) {
-		boolean found = false;
-		for (String s : sensorNames) {
-			if (s.equals(eventName)) {
-				found = true;
-				break;
-			}
-		}
-		if (!found) {
-			StringBuilder sb = new StringBuilder("\t");
-			sb.append(eventName);
-			logRaw(sb.toString());
-			sensorNames.add(eventName);
-		}
-		StringBuilder sb = new StringBuilder(dateStr);
-		sb.append("\t")
-				.append(value);
-		logRaw(sb.toString());
-	}
-
 	final private DateTimeFormatter googleSheetsDateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
 	private void doLog(LocalDateTime d, String eventName, String value, String deviceName) {
 		String dateStr = googleSheetsDateFormat.format(d);
@@ -260,7 +240,6 @@ public class UnitWatcher extends Thread {
 				+ "\t" + eventName
 				+ "\t" + value
 				+ "\t" + deviceName);
-//		logForGSheet(dateStr, eventName, value);
 	}
 
 	private Map<String, String> dataAlreadyLogged = new HashMap<String, String>();
@@ -285,6 +264,7 @@ public class UnitWatcher extends Thread {
 					LocalDateTime d = toDate(timestamp.getText());
 					doLog(d, eventname.getText(), myElement.getText(), deviceName);
 					dataAlreadyLogged.put(key, myElement.getText());
+					sensorNames.put(eventname.getText(), eventname.getText());
 					if ((mostRecent == null) || (mostRecent.isBefore(d))) {
 						mostRecent = d;
 					}
@@ -443,16 +423,33 @@ public class UnitWatcher extends Thread {
 		log(deviceName + " : Started browser");
 	}
 
+	private void logARowWithNoData() {
+		String sensorName = "unknown sensor";
+		Set<String> names = sensorNames.keySet();
+		Iterator<String> sensorIt = names.iterator();
+		while (sensorIt.hasNext()) {
+			String n = sensorIt.next();
+			if (n.contains("ensor")) {
+				// Doesn't matter which sensor is picked, since its value will be empty.
+				// We just want a placeholder to indicate a gap in the data.
+				sensorName = n;
+				break;
+			}
+		}
+		doLog(LocalDateTime.now(), sensorName, "", deviceName);
+	}
+
 	private void monitorMsgs() throws Exception {
 		goToDevice(deviceName);
 		while (true) {
 			LocalDateTime mostRecent = monitorMessages(deviceName);
 			if (mostRecent != null) {
 				Duration d = Duration.between(mostRecent, LocalDateTime.now());
-				
-				// Would be nice to not have to wait 2 intervals,
-				// but we can't count on the clocks on all the machines being in sync.
+
+				// We could wait 1 interval, but that might introduce noise,
+				// since we can't count on the clocks on all the machines being in sync.
 				if (d.getSeconds() > 2 * expectedIntervalInMinutes * 60) {
+					logARowWithNoData();
 					// Web page randomly stops updating. Restart it.
 					driver.quit();
 					driver = null;
