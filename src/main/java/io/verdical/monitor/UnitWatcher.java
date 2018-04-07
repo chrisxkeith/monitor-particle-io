@@ -63,7 +63,9 @@ public class UnitWatcher extends Thread {
 	private final LocalDateTime serverStarted = LocalDateTime.now();
 
 	public UnitWatcher(String creds) throws Exception {
-		setCredentials(creds);
+		if (!setCredentials(creds)) {
+			return;
+		}
 		logFileName = getLogFileName();
 		init();
 	}
@@ -356,16 +358,17 @@ public class UnitWatcher extends Thread {
 		return creds;
 	}
 
-	private void setCredentials(String c) {
+	private boolean setCredentials(String c) {
 		String creds[] = c.split(" ");
-		if ((creds == null) || (creds.length < 4)) {
+		if ((creds == null) || (creds.length != 4)) {
 			System.out.println("bad input, expected : accountName accountPw deviceName expectedIntervalInMinutes");
-			System.exit(-8);
+			return false;
 		}
 		accountName = creds[0];
 		accountPw = creds[1] + "\r\n"; // TODO : probably only works on Windows.
 		deviceName = creds[2];
 		expectedIntervalInMinutes = Integer.parseInt(creds[3]);
+		return true;
 	}
 
 	private void takeScreenshot() {
@@ -461,6 +464,9 @@ public class UnitWatcher extends Thread {
 	}
 
 	public void run() {
+		if (accountName == null) {
+			return;
+		}
 		try {
 			// testParsing();
 			monitorMsgs();
