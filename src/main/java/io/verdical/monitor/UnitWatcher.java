@@ -6,6 +6,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.PrintStream;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -124,6 +126,7 @@ public class UnitWatcher extends Thread {
 		} catch (Exception e) {
 			System.out
 					.println(s + "\tError writing log file : " + logFileName + "\t" + e.toString());
+		    e.printStackTrace(new PrintStream(System.out));
 		}
 	}
 
@@ -148,6 +151,7 @@ public class UnitWatcher extends Thread {
 			WebElement devicesEl = driver.findElement(By.className(className));
 			devicesEl.click();
 		} catch (Exception e) {
+		    e.printStackTrace(new PrintStream(System.out));
 			throw new Exception("Error waiting for elementToBeClickable By.className(\"" + className + "\"). Are you logged into build.particle.io?");
 		}
 	}
@@ -157,6 +161,7 @@ public class UnitWatcher extends Thread {
 		try {
 			wait.until(ExpectedConditions.elementToBeClickable(By.className("newcore")));
 		} catch (Exception e) {
+		    e.printStackTrace(new PrintStream(System.out));
 			throw new Exception("Error waiting for elementToBeClickable By.className(\"newcore\"). Are the 'Particle Devices' visible?");
 		}
 	}
@@ -188,6 +193,7 @@ public class UnitWatcher extends Thread {
 					System.out.println("Pass : " + input);
 				} catch (Exception e) {
 					System.out.println("FAIL : " + input + " : " + e.getMessage());
+				    e.printStackTrace(new PrintStream(System.out));
 				}
 			}
 		}
@@ -231,17 +237,18 @@ public class UnitWatcher extends Thread {
 			System.out.println("input:          " + input);
 			System.out.println("particleFormat: " + particleFormat);
 			System.out.println(formatter);
+		    e.printStackTrace(new PrintStream(System.out));
 			throw e;
 		}
 	}
 
 	final private DateTimeFormatter googleSheetsDateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
-	private void doLog(LocalDateTime d, String eventName, String value, String deviceName) {
+	private String buildLogString(LocalDateTime d, String eventName, String value, String deviceName) {
 		String dateStr = googleSheetsDateFormat.format(d);
-		log(dateStr
+		return dateStr
 				+ "\t" + eventName
 				+ "\t" + value
-				+ "\t" + deviceName);
+				+ "\t" + deviceName;
 	}
 
 	private Map<String, String> dataAlreadyLogged = new HashMap<String, String>();
@@ -255,6 +262,8 @@ public class UnitWatcher extends Thread {
 				mostRecent = d;
 			}
 		}
+		ConcurrentSkipListMap<String, String> outputRows = new ConcurrentSkipListMap<String, String>();
+
 		List<WebElement> messages = driver.findElements(By.className("event-data"));
 		for (WebElement myElement : messages) {
 			try {
@@ -264,7 +273,7 @@ public class UnitWatcher extends Thread {
 				String key = eventname.getText() + "!" + timestamp.getText();
 				if (dataAlreadyLogged.get(key) == null) {
 					LocalDateTime d = toDate(timestamp.getText());
-					doLog(d, eventname.getText(), myElement.getText(), deviceName);
+					outputRows.put(key, buildLogString(d, eventname.getText(), myElement.getText(), deviceName));
 					dataAlreadyLogged.put(key, myElement.getText());
 					sensorNames.put(eventname.getText(), eventname.getText());
 					if ((mostRecent == null) || (mostRecent.isBefore(d))) {
@@ -275,8 +284,14 @@ public class UnitWatcher extends Thread {
 				// Pain in the ass browser(s)...
 				if (!e.getClass().equals(StaleElementReferenceException.class)) {
 					log("monitorMessages : " + e);
+				    e.printStackTrace(new PrintStream(System.out));
 				}
 			}
+		}
+		Set<String> keys = outputRows.keySet();
+		Iterator<String> itr = keys.iterator();
+		while (itr.hasNext()) {
+			log(outputRows.get(itr.next()));
 		}
 		return mostRecent;
 	}
@@ -381,7 +396,14 @@ public class UnitWatcher extends Thread {
 			log("takeScreenshot() : " + fn);
 		} catch (Exception e) {
 			log("takeScreenshot() exception : " + e.toString());
+		    e.printStackTrace(new PrintStream(System.out));
 		}
+	}
+
+	void handleException(Throwable e) {
+		takeScreenshot();
+		log("monitorDevices() : " + e.toString());
+	    e.printStackTrace(new PrintStream(System.out));
 	}
 
 	@SuppressWarnings("unused")
@@ -394,8 +416,7 @@ public class UnitWatcher extends Thread {
 				doSleep(minutesBetweenDeviceScans);
 				driver.quit();
 			} catch (Exception e) {
-				takeScreenshot();
-				log("run() : " + e.toString());
+				handleException(e);
 			} finally {
 				// Try to leave previous instance of browser running for diagnostic purposes.
 				driver = null;
@@ -440,7 +461,7 @@ public class UnitWatcher extends Thread {
 				break;
 			}
 		}
-		doLog(LocalDateTime.now(), sensorName, "", deviceName);
+		log(buildLogString(LocalDateTime.now(), sensorName, "", deviceName));
 	}
 
 	private void monitorMsgs() throws Exception {
@@ -473,8 +494,7 @@ public class UnitWatcher extends Thread {
 			monitorMsgs();
 			// monitorDevices();
 		} catch (Throwable e) {
-			// TODO : display stack also.
-			log("run() : " + e.getClass().getName() + " " + e.getMessage());
+		    handleException(e);
 			driver = null;
 		} finally {
 			if (driver != null) {
@@ -494,6 +514,7 @@ public class UnitWatcher extends Thread {
 			}
 		} catch (Exception e) {
 			System.out.println("main() : " + LocalDateTime.now().toString() + "\t" + e.getClass().getName() + " " + e.getMessage());
+		    e.printStackTrace(new PrintStream(System.out));
 		}
 	}
 }
