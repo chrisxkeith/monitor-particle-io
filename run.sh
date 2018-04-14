@@ -20,9 +20,9 @@ jcp=${jcp}';\Users\Chris\.m2\repository\org\codehaus\mojo\animal-sniffer-annotat
 jcp=${jcp}';\Users\Chris\.m2\repository\org\apache\httpcomponents\httpclient\4.5.3\httpclient-4.5.3.jar'
 jcp=${jcp}';\Users\Chris\.m2\repository\org\apache\httpcomponents\httpcore\4.4.6\httpcore-4.4.6.jar'
 jcp=${jcp}';\Users\Chris\.m2\repository\com\google\guava\guava\23.0\guava-23.0.jar'
-jcp=${jcp}';\Users\Chris\.m2\repository\com\squareup\okhttp3\okhttp3\3.9.1\okhttp-3.9.1.jar'
+jcp=${jcp}';\Users\Chris\.m2\repository\com\squareup\okhttp3\okhttp\3.9.1\okhttp-3.9.1.jar'
 jcp=${jcp}';\Users\Chris\.m2\repository\com\squareup\okio\okio\1.13.0\okio-1.13.0.jar'
-jcp=${jcp}';\Users\Chris\.m2\repository\commons-io\commons-io\2.6\commons-io-1.26.jar'
+jcp=${jcp}';\Users\Chris\.m2\repository\commons-io\commons-io\2.6\commons-io-2.6.jar'
 jcp=${jcp}';\Users\Chris\.m2\repository\commons-codec\commons-codec\1.10\commons-codec-1.10.jar'
 jcp=${jcp}';\Users\Chris\.m2\repository\commons-logging\commons-logging\1.2\commons-logging-1.2.jar'
 
