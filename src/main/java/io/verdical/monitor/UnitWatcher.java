@@ -136,13 +136,22 @@ public class UnitWatcher extends Thread {
 	}
 
 	private void login() throws Exception {
-		driver.get("https://build.particle.io/");
-		Thread.sleep(2 * 1000);
-		WebElement name = driver.findElement(By.name("username"));
-		name.sendKeys(accountName);
-		Thread.sleep(2 * 1000);
-		WebElement pw = driver.findElement(By.name("password"));
-		pw.sendKeys(accountPw);
+		boolean loggedIn = false;
+		while (!loggedIn) {
+			try {
+				driver.get("https://build.particle.io/");
+				Thread.sleep(2 * 1000);
+				WebElement name = driver.findElement(By.name("username"));
+				name.sendKeys(accountName);
+				Thread.sleep(2 * 1000);
+				WebElement pw = driver.findElement(By.name("password"));
+				pw.sendKeys(accountPw);
+				loggedIn = true;
+			} catch (Exception e) {
+				handleException("Login failed. Retrying infinitely every 5 minutes ...", e);
+				doSleep(5);
+			}
+		}
 	}
 
 	private void goToTool(String className) throws Exception {
@@ -400,9 +409,9 @@ public class UnitWatcher extends Thread {
 		}
 	}
 
-	void handleException(Throwable e) {
+	void handleException(String message, Throwable e) {
 		takeScreenshot();
-		log("monitorDevices() : " + e.toString());
+		log(message + " : " + e.toString());
 	    e.printStackTrace(new PrintStream(System.out));
 	}
 
@@ -416,7 +425,7 @@ public class UnitWatcher extends Thread {
 				doSleep(minutesBetweenDeviceScans);
 				driver.quit();
 			} catch (Exception e) {
-				handleException(e);
+				handleException("", e);
 			} finally {
 				// Try to leave previous instance of browser running for diagnostic purposes.
 				driver = null;
@@ -494,7 +503,7 @@ public class UnitWatcher extends Thread {
 			monitorMsgs();
 			// monitorDevices();
 		} catch (Throwable e) {
-		    handleException(e);
+		    handleException("", e);
 			driver = null;
 		} finally {
 			if (driver != null) {
