@@ -39,30 +39,24 @@ public class UnitWatcher extends Thread {
 	
 	private static final Logger logger = Logger.getLogger(UnitWatcher.class.getName());
 
-	// I have seen it take up to half an hour for an unplugged Photon to register in the Particle cloud.
-	// In production, don't scan more often than once every 30 minutes.
-	private static int minutesBetweenDeviceScans = 30;
-	private static int minutesAllowedOffline = 24 * 60;
-
 	private String accountName;
 	private String accountPw;
 	private String deviceName;
 	private Integer expectedIntervalInMinutes;
 	private Map<String, String> sensorNames = new HashMap<String, String>();
 
+	@SuppressWarnings("unused")
 	private final boolean isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
-			.indexOf("jdwp") >= 0;;
+			.indexOf("jdwp") >= 0;
+
 	private final int sleepFactor = 2; // increase for slower computers.
 	private final int sleepSeconds = 10 * sleepFactor;
 
 	private WebDriver driver;
 	private WebDriverWait wait;
 	
-    private Map<String, LocalDateTime> unitLastConnected = new HashMap<String, LocalDateTime>();
-
 	private String logFileName;
 	private final SimpleDateFormat logDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
-	private final LocalDateTime serverStarted = LocalDateTime.now();
 
 	public UnitWatcher(String creds) throws Exception {
 		if (!setCredentials(creds)) {
@@ -74,21 +68,7 @@ public class UnitWatcher extends Thread {
 
 	private void init() throws Exception {
 		log(deviceName + " : server starting up.");
-		if (isDebug) {
-			minutesBetweenDeviceScans = 5;
-			minutesAllowedOffline = 3;
-		}
 		logger.info("Logging to " + logFileName);
-		unitLastConnected.put("bobcat_pizza", null);
-		unitLastConnected.put("CatDev", null);
-		unitLastConnected.put("JARDINIERE", null);
-		unitLastConnected.put("MCDS-ver_2", null);
-		unitLastConnected.put("PMH-1", null);
-		unitLastConnected.put("Saha_2", null);
-		unitLastConnected.put("Saha-1", null);
-		unitLastConnected.put("test-4a", null);
-		unitLastConnected.put("test-8EJV", null);
-		unitLastConnected.put("TSWE", null);
 	}
 
 	private static String getHomeDir() throws Exception {
@@ -141,9 +121,11 @@ public class UnitWatcher extends Thread {
 			try {
 				driver.get("https://build.particle.io/");
 				Thread.sleep(2 * 1000);
+
+                wait.until(ExpectedConditions.elementToBeClickable(By.name("username")));
 				WebElement name = driver.findElement(By.name("username"));
 				name.sendKeys(accountName);
-				Thread.sleep(2 * 1000);
+                wait.until(ExpectedConditions.elementToBeClickable(By.name("password")));
 				WebElement pw = driver.findElement(By.name("password"));
 				pw.sendKeys(accountPw);
 				loggedIn = true;
@@ -151,27 +133,6 @@ public class UnitWatcher extends Thread {
 				handleException("Login failed. Retrying infinitely every 5 minutes ...", e);
 				doSleep(5);
 			}
-		}
-	}
-
-	private void goToTool(String className) throws Exception {
-		try {
-			wait.until(ExpectedConditions.elementToBeClickable(By.className(className)));
-			WebElement devicesEl = driver.findElement(By.className(className));
-			devicesEl.click();
-		} catch (Exception e) {
-		    e.printStackTrace(new PrintStream(System.out));
-			throw new Exception("Error waiting for elementToBeClickable By.className(\"" + className + "\"). Are you logged into build.particle.io?");
-		}
-	}
-
-	private void goToDevices() throws Exception {
-		goToTool("ion-pinpoint");
-		try {
-			wait.until(ExpectedConditions.elementToBeClickable(By.className("newcore")));
-		} catch (Exception e) {
-		    e.printStackTrace(new PrintStream(System.out));
-			throw new Exception("Error waiting for elementToBeClickable By.className(\"newcore\"). Are the 'Particle Devices' visible?");
 		}
 	}
 
@@ -305,50 +266,6 @@ public class UnitWatcher extends Thread {
 		return mostRecent;
 	}
 
-	private void watchUnits() throws Exception {
-		goToDevices();
-	    LocalDateTime currentTime = LocalDateTime.now();
-	    List<String> unitsAlive = new ArrayList<String>();
-
-		WebElement listEl = driver.findElement(By.className("cores"));
-		List<WebElement> photons = listEl.findElements(By.className("breathing"));
-		for (WebElement myElement : photons) {
-			// div > div > li
-			WebElement greatgrandparent = myElement.findElement(By.xpath("../../.."));
-			WebElement title = greatgrandparent.findElement(By.className("title"));
-			unitsAlive.add(title.getText());
-		}
-		for (String name : unitsAlive) {
-			unitLastConnected.put(name, currentTime);
-		}
-	    LocalDateTime limit = LocalDateTime.now().minusMinutes(minutesAllowedOffline);
-	    if (limit.isAfter(serverStarted)) {
-			for (String key : unitLastConnected.keySet()) {
-				if (unitLastConnected.get(key) == null) {
-					// Detect units that haven't connected since this server started.
-					unitLastConnected.put(key, serverStarted);
-				}
-			}
-	    }
-		for (String key : unitLastConnected.keySet()) {
-			String status = "unknown";
-			if (unitLastConnected.get(key) == null) {
-				status = "not connected yet";
-			} else if (unitLastConnected.get(key).isBefore(limit)) {
-				ZonedDateTime zdt = unitLastConnected.get(key).atZone(ZoneId.systemDefault());
-				// TODO : convert to java.time.LocalDateTime if we need this code again.
-				java.util.Date output = java.util.Date.from(zdt.toInstant());
-				String d = logDateFormat.format(output);
-				status = "disconnected since " + d;
-			} else {
-				status = "connected";
-			}
-			StringBuilder sb = new StringBuilder(key);
-			sb.append("\t").append(status);
-			log(sb.toString());
-		}
-	}
-
 	private void doSleep(int nMinutes) throws Exception {
 		int secs = nMinutes * 60;
 		logger.info(deviceName + " : About to sleep for " + nMinutes + " minutes.");
@@ -390,22 +307,26 @@ public class UnitWatcher extends Thread {
 			return false;
 		}
 		accountName = creds[0];
-		accountPw = creds[1] + "\r\n"; // TODO : probably only works on Windows.
+		accountPw = creds[1] + "\r\n"; // TODO : may only work on Windows.
 		deviceName = creds[2];
 		expectedIntervalInMinutes = Integer.parseInt(creds[3]);
 		return true;
 	}
 
 	private void takeScreenshot() {
-		try {
-			File src = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
-			String fn = getHomeDir() + File.separator + "Documents" + File.separator + "Github" + File.separator
-					+ "screenshot_" + UUID.randomUUID().toString() + ".png";
-			FileUtils.copyFile(src, new File(fn));
-			log("takeScreenshot() : " + fn);
-		} catch (Exception e) {
-			log("takeScreenshot() exception : " + e.toString());
-		    e.printStackTrace(new PrintStream(System.out));
+		if (driver == null) {
+			log("takeScreenshot() : driver not initialized.");
+		} else {
+			try {
+				File src = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
+				String fn = getHomeDir() + File.separator + "Documents" + File.separator + "Github" + File.separator
+						+ "screenshot_" + UUID.randomUUID().toString() + ".png";
+				FileUtils.copyFile(src, new File(fn));
+				log("takeScreenshot() : " + fn);
+			} catch (Exception e) {
+				log("takeScreenshot() exception : " + e.toString());
+			    e.printStackTrace(new PrintStream(System.out));
+			}
 		}
 	}
 
@@ -413,24 +334,6 @@ public class UnitWatcher extends Thread {
 		takeScreenshot();
 		log(message + " : " + e.toString());
 	    e.printStackTrace(new PrintStream(System.out));
-	}
-
-	@SuppressWarnings("unused")
-	private void monitorDevices() {
-		while (true) {
-			try {
-				initBrowserDriver();
-				login();
-				watchUnits();
-				doSleep(minutesBetweenDeviceScans);
-				driver.quit();
-			} catch (Exception e) {
-				handleException("", e);
-			} finally {
-				// Try to leave previous instance of browser running for diagnostic purposes.
-				driver = null;
-			}
-		}
 	}
 
 	private void clickOnDevice(String deviceName) {
@@ -501,7 +404,6 @@ public class UnitWatcher extends Thread {
 		try {
 			// testParsing();
 			monitorMsgs();
-			// monitorDevices();
 		} catch (Throwable e) {
 		    handleException("", e);
 			driver = null;
