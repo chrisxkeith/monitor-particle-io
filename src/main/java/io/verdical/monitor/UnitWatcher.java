@@ -40,7 +40,7 @@ public class UnitWatcher extends Thread {
 	private String accountPw;
 	private String deviceName;
 	private Integer expectedIntervalInMinutes;
-	private Map<String, String> sensorNames = new HashMap<String, String>();
+	private Map<String, String> eventNames = new HashMap<String, String>();
 
 	@SuppressWarnings("unused")
 	private final boolean isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString()
@@ -242,7 +242,7 @@ public class UnitWatcher extends Thread {
 					LocalDateTime d = toDate(timestamp.getText());
 					outputRows.put(key, buildLogString(d, eventname.getText(), myElement.getText(), deviceName));
 					dataAlreadyLogged.put(key, myElement.getText());
-					sensorNames.put(eventname.getText(), eventname.getText());
+					eventNames.put(eventname.getText(), eventname.getText());
 					if ((mostRecent == null) || (mostRecent.isBefore(d))) {
 						mostRecent = d;
 					}
@@ -358,19 +358,14 @@ public class UnitWatcher extends Thread {
 	}
 
 	private void logARowWithNoData() {
-		String sensorName = "unknown sensor";
-		Set<String> names = sensorNames.keySet();
-		Iterator<String> sensorIt = names.iterator();
-		while (sensorIt.hasNext()) {
-			String n = sensorIt.next();
-			if (n.contains("ensor")) {
-				// Doesn't matter which sensor is picked, since its value will be empty.
-				// We just want a placeholder to indicate a gap in the data.
-				sensorName = n;
-				break;
-			}
+		String eventName = "unknown event";
+		Set<String> names = eventNames.keySet();
+		Iterator<String> eventIt = names.iterator();
+		while (eventIt.hasNext()) {
+			eventName = eventIt.next();
+			break;
 		}
-		log(buildLogString(LocalDateTime.now(), sensorName, "", deviceName));
+		log(buildLogString(LocalDateTime.now(), eventName, "", deviceName));
 	}
 
 	private void monitorMsgs() throws Exception {
@@ -382,7 +377,7 @@ public class UnitWatcher extends Thread {
 
 				// We could wait 1 interval, but that might introduce noise,
 				// since we can't count on the clocks on all the machines being in sync.
-				if (d.getSeconds() > 2 * expectedIntervalInMinutes * 60) {
+				if ((!eventNames.isEmpty()) && (d.getSeconds() > 2 * expectedIntervalInMinutes * 60)) {
 					logARowWithNoData();
 					// Web page randomly stops updating. Restart it.
 					driver.quit();
