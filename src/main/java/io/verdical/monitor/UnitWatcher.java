@@ -7,6 +7,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -99,6 +101,7 @@ public class UnitWatcher extends Thread {
 			System.out.println(s);
 			FileWriter fstream = new FileWriter(logFileName, true);
 			fstream.write(s + System.getProperty("line.separator"));
+			fstream.flush();
 			fstream.close();
 		} catch (Exception e) {
 			System.out
@@ -142,27 +145,6 @@ public class UnitWatcher extends Thread {
 
 		for (int seconds = 0; seconds < 300; seconds += 10) {
 			// loop until all "pump on" messages are found.
-		}
-	}
-
-	// java.time.Date parsing works differently from java.util.Date.
-	// Run some tests to figure it out.
-	@SuppressWarnings("unused")
-	private void testParsing() {
-		String[] digits = {"8", "08"};
-		for (String hour : digits) {
-			String[] days = {"4", "10"};
-			for (String day : days) {
-				String input = "March " + day + "th at " + hour + ":50:11 AM";
-				// March 25th at 9:25:36 am
-				try {
-					toDate(input);
-					System.out.println("Pass : " + input);
-				} catch (Exception e) {
-					System.out.println("FAIL : " + input + " : " + e.getMessage());
-				    e.printStackTrace(new PrintStream(System.out));
-				}
-			}
 		}
 	}
 
@@ -263,10 +245,14 @@ public class UnitWatcher extends Thread {
 		return mostRecent;
 	}
 
-	private void doSleep(int nMinutes) throws Exception {
-		int secs = nMinutes * 60;
-		logger.info(deviceName + " : About to sleep for " + nMinutes + " minutes.");
-	    Thread.sleep(secs * 1000);
+	private void doSleep(int nMinutes) {
+	    try {
+			int secs = nMinutes * 60;
+			logger.info(deviceName + " : About to sleep for " + nMinutes + " minutes.");
+		    Thread.sleep(secs * 1000);
+	    } catch (Exception e2) {
+		    handleException("doSleep()", e2);
+	    }
 	}
 
 	private void initBrowserDriver() {
@@ -329,8 +315,14 @@ public class UnitWatcher extends Thread {
 
 	void handleException(String message, Throwable e) {
 		takeScreenshot();
-		log(message + " : " + e.toString());
+		log("handleException() : " + message + " : " + e.toString());
 	    e.printStackTrace(new PrintStream(System.out));
+
+	    StringWriter writer = new StringWriter();
+	    PrintWriter printWriter = new PrintWriter( writer );
+	    e.printStackTrace( printWriter );
+	    printWriter.flush();
+	    log(writer.toString());
 	}
 
 	private void clickOnDevice(String deviceName) {
@@ -393,16 +385,17 @@ public class UnitWatcher extends Thread {
 		if (accountName == null) {
 			return;
 		}
-		try {
-			// testParsing();
-			monitorMsgs();
-		} catch (Throwable e) {
-		    handleException("", e);
-			driver = null;
-		} finally {
-			if (driver != null) {
-				driver.quit();
-				driver = null;
+		while (true) {
+			try {
+				monitorMsgs();
+			} catch (Throwable e) {
+				handleException("run() : Retrying infinitely every 5 minutes ...", e);
+				doSleep(5);
+			} finally {
+				if (driver != null) {
+					driver.quit();
+					driver = null;
+				}
 			}
 		}
 	}
