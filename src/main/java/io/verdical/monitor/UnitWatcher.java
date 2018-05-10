@@ -313,9 +313,10 @@ public class UnitWatcher extends Thread {
 	    log(writer.toString());
 	}
 
-	private void clickOnDevice(String deviceName) {
+	private void clickOnDevice(String deviceName) throws Exception {
 		boolean morePages = true;
 		while (morePages) {
+			Thread.sleep(5 * 2000);
 			List<WebElement> devices = driver.findElements(By.className("device"));
 			for (WebElement myElement : devices) {
 				WebElement name = myElement.findElement(By.className("device-name"));
@@ -336,7 +337,6 @@ public class UnitWatcher extends Thread {
 			}
 		}
 		log("Unable to find unit named : " + deviceName);
-		System.exit(-6);
 	}
 
 	private void goToDevice(String deviceName) throws Exception {
@@ -344,7 +344,6 @@ public class UnitWatcher extends Thread {
 		login();
 		Thread.sleep(5 * 1000);
 		driver.get("https://console.particle.io/devices");
-		Thread.sleep(5 * 1000);
 		clickOnDevice(deviceName);
 		Thread.sleep(5 * 1000);
 		log(deviceName + " : Started browser");
