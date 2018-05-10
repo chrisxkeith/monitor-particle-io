@@ -136,18 +136,6 @@ public class UnitWatcher extends Thread {
 		}
 	}
 
-	// Use if code is needed to navigate to Particle console and record 'pump on' messages.
-	@SuppressWarnings("unused")
-	private void recordPumpMessages() throws Exception {
-	    LocalDateTime wakeUp = LocalDateTime.now().plusHours(1).withMinute(0);
-		Duration duration = Duration.between(wakeUp, LocalDateTime.now());
-		Thread.sleep(duration.toMinutes() * 60 * 1000);
-
-		for (int seconds = 0; seconds < 300; seconds += 10) {
-			// loop until all "pump on" messages are found.
-		}
-	}
-
 	final private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'hh:mm:ss' 'a");
 
 	private LocalDateTime toDate(String particleFormat) throws Exception {
@@ -326,12 +314,25 @@ public class UnitWatcher extends Thread {
 	}
 
 	private void clickOnDevice(String deviceName) {
-		List<WebElement> devices = driver.findElements(By.className("device"));
-		for (WebElement myElement : devices) {
-			WebElement name = myElement.findElement(By.className("device-name"));
-			if (name.getText().equals(deviceName)) {
-				name.click();
-				return;
+		boolean morePages = true;
+		while (morePages) {
+			List<WebElement> devices = driver.findElements(By.className("device"));
+			for (WebElement myElement : devices) {
+				WebElement name = myElement.findElement(By.className("device-name"));
+				if (name.getText().equals(deviceName)) {
+					name.click();
+					return;
+				}
+			}
+			try {
+				WebElement next = driver.findElement(By.className("next"));
+				if (next != null) {
+					next.findElement(By.linkText("»")).click();
+				} else {
+					morePages = false;
+				}
+			} catch (Exception e) {
+				morePages = false;
 			}
 		}
 		log("Unable to find unit named : " + deviceName);
