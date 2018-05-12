@@ -439,7 +439,7 @@ public class UnitWatcher extends Thread {
 				}
 		    }
 		    if (!connected) {
-				log(buildLogString(LocalDateTime.now(), "Device is not breathing blue.", "", deviceName));
+				log(buildLogString(LocalDateTime.now(), "Device is not breathing blue.", "1", deviceName));
 				return;
 		    }
 		} catch (Exception e) {
