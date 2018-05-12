@@ -13,6 +13,7 @@ import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -381,8 +382,68 @@ public class UnitWatcher extends Thread {
 		}
 	}
 
+	private void goToTool(String className) throws Exception {
+		try {
+			wait.until(ExpectedConditions.elementToBeClickable(By.className(className)));
+			WebElement devicesEl = driver.findElement(By.className(className));
+			devicesEl.click();
+		} catch (Exception e) {
+			throw new Exception("Error waiting for elementToBeClickable By.className(\"" + className + "\"). Are you logged into build.particle.io?");
+		}
+	}
+
+	private void goToDevices() throws Exception {
+		goToTool("ion-pinpoint");
+		try {
+			wait.until(ExpectedConditions.elementToBeClickable(By.className("newcore")));
+		} catch (Exception e) {
+			throw new Exception("Error waiting for elementToBeClickable By.className(\"newcore\"). Are the 'Particle Devices' visible?");
+		}
+	}
+
+	private List<String> findConnectedUnits() throws Exception {
+		List<String> connectedUnits = new ArrayList<String>();
+		initBrowserDriver();
+
+	    try {
+			login();
+			goToDevices();
+
+			// TODO : will there be any issues (e.g., multiple web pages) with lots of devices?
+			WebElement listEl = driver.findElement(By.className("cores"));
+			List<WebElement> photons = listEl.findElements(By.className("breathing"));
+			for (WebElement myElement : photons) {
+				// div > div > li
+				WebElement greatgrandparent = myElement.findElement(By.xpath("../../.."));
+				WebElement title = greatgrandparent.findElement(By.className("title"));
+				connectedUnits.add(title.getText());
+			}
+	    } finally {
+			driver.quit();
+			driver = null;
+	    }
+		return connectedUnits;
+	}
+
+
 	public void run() {
 		if (accountName == null) {
+			return;
+		}
+		try {
+			boolean connected = false;
+			for (String s : findConnectedUnits()) {
+				if (s.equals(deviceName)) {
+					connected = true;
+					break;
+				}
+		    }
+		    if (!connected) {
+				log("\t\tDevice is not breathing blue.\t" + deviceName);
+				return;
+		    }
+		} catch (Exception e) {
+			handleException("run() : failed trying to find device status.", e);
 			return;
 		}
 		while (true) {
