@@ -252,18 +252,19 @@ public class UnitWatcher extends Thread {
 		}
 	}
 
-	private static String[] readCredentials() throws Exception {
+	private static ArrayList<String> readCredentials() throws Exception {
 		String credentialsFileName = getCredentialsFileName();
 		File f = new File(credentialsFileName);
 		if (!f.exists()) {
 			System.out.println("No credentials file : " + credentialsFileName);
 			System.exit(-7);
 		}
-		String[] creds = new String[10];
+		ArrayList<String> creds = new ArrayList<String>(10);
 		BufferedReader br = new BufferedReader(new FileReader(credentialsFileName));
 		try {
-			for (int i = 0; i < 10; i++) {
-				creds[i++] = br.readLine();
+			String s;
+			while ((s = br.readLine()) != null) {
+				creds.add(s);
 			}
 		} finally {
 			br.close();
@@ -442,6 +443,7 @@ public class UnitWatcher extends Thread {
 				log(buildLogString(LocalDateTime.now(), "Device is not breathing blue.", "1", deviceName));
 				return;
 		    }
+		    Thread.sleep(5 * 1000);
 		} catch (Exception e) {
 			handleException("run() : failed trying to find device status.", e);
 			return;
@@ -463,7 +465,7 @@ public class UnitWatcher extends Thread {
 
 	public static void main(String[] args) {
 		try {
-			String[] creds = readCredentials();
+			ArrayList<String> creds = readCredentials();
 			for (String c : creds) {
 				if (c != null) {
 					 (new UnitWatcher(c)).start();
