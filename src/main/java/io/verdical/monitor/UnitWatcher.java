@@ -67,7 +67,7 @@ public class UnitWatcher extends Thread {
 	}
 
 	private void init() throws Exception {
-		log(deviceName + " : server starting up.");
+		log(deviceName + " : thread starting up.");
 		logger.info("Logging to " + logFileName);
 	}
 
@@ -341,10 +341,16 @@ public class UnitWatcher extends Thread {
 		log("Unable to find unit named : " + deviceName);
 	}
 
-	private void goToDevice(String deviceName) throws Exception {
+	private void doLogin() throws Exception {
 		initBrowserDriver();
 		login();
 		Thread.sleep(5 * 1000);
+	}
+
+	private void goToDevice(String deviceName) throws Exception {
+		if (driver == null) {
+			doLogin();
+		}
 		driver.get("https://console.particle.io/devices");
 		clickOnDevice(deviceName);
 		Thread.sleep(5 * 1000);
@@ -402,12 +408,10 @@ public class UnitWatcher extends Thread {
 		}
 	}
 
-	private List<String> findConnectedUnits() throws Exception {
-		List<String> connectedUnits = new ArrayList<String>();
-		initBrowserDriver();
-
+	private boolean deviceIsConnected(String deviceName) {
+		boolean ret = false;
 	    try {
-			login();
+			doLogin();
 			goToDevices();
 
 			// TODO : will there be any issues (e.g., multiple web pages) with lots of devices?
@@ -417,13 +421,23 @@ public class UnitWatcher extends Thread {
 				// div > div > li
 				WebElement greatgrandparent = myElement.findElement(By.xpath("../../.."));
 				WebElement title = greatgrandparent.findElement(By.className("title"));
-				connectedUnits.add(title.getText());
+				if (deviceName.equals(title.getText())) {
+					ret = true;
+					break;
+				}
 			}
-	    } finally {
-			driver.quit();
-			driver = null;
+			Thread.sleep(5 * 1000);
+	    } catch (Exception e) {
+			// Handle as if not connected.
 	    }
-		return connectedUnits;
+	    if (!ret) {
+			log(buildLogString(LocalDateTime.now(), "Device is not breathing blue.", "1", deviceName));
+	    }
+		// TODO : Would be nice to leave browser running to monitor device messages,
+		// but will need to figure out how to click on the "Leave page?" dialog when going to device page.
+		driver.quit();
+		driver = null;
+	    return ret;
 	}
 
 
@@ -431,23 +445,9 @@ public class UnitWatcher extends Thread {
 		if (accountName == null) {
 			return;
 		}
-		try {
-			boolean connected = false;
-			for (String s : findConnectedUnits()) {
-				if (s.equals(deviceName)) {
-					connected = true;
-					break;
-				}
-		    }
-		    if (!connected) {
-				log(buildLogString(LocalDateTime.now(), "Device is not breathing blue.", "1", deviceName));
-				return;
-		    }
-		    Thread.sleep(5 * 1000);
-		} catch (Exception e) {
-			handleException("run() : failed trying to find device status.", e);
+		if (!deviceIsConnected(deviceName)) {
 			return;
-		}
+	    }
 		while (true) {
 			try {
 				monitorMsgs();
