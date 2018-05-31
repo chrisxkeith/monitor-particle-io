@@ -445,14 +445,15 @@ public class UnitWatcher extends Thread {
 		if (accountName == null) {
 			return;
 		}
-		if (!deviceIsConnected(deviceName)) {
-			return;
+		while (!deviceIsConnected(deviceName)) {
+			log(deviceName + " : run() : Waiting for device to connect, retrying infinitely every 60 minutes ...");
+			doSleep(60);
 	    }
 		while (true) {
 			try {
 				monitorMsgs();
 			} catch (Throwable e) {
-				handleException("run() : Retrying infinitely every 5 minutes ...", e);
+				handleException(deviceName + " : run() : Retrying infinitely every 5 minutes ...", e);
 				doSleep(5);
 			} finally {
 				if (driver != null) {
